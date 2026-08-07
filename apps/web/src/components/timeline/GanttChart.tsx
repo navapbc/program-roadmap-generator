@@ -64,7 +64,7 @@ export default function GanttChart({
 
   return (
     <div>
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end mb-2 no-export">
         <ZoomControl
           onZoomIn={zoom.zoomIn}
           onZoomOut={zoom.zoomOut}
