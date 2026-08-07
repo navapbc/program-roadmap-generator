@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availableScales, computeScaleTicks, SCALE_DISPLAY_ORDER } from '../ganttHeader.js';
+import { availableScales, computeScaleTicks, isDayScaleReadable, SCALE_DISPLAY_ORDER } from '../ganttHeader.js';
 
 describe('computeScaleTicks', () => {
   it('month ticks snap to real calendar boundaries, not a flat average', () => {
@@ -8,9 +8,9 @@ describe('computeScaleTicks', () => {
       totalDurationWeeks: 12,
     });
 
-    expect(ticks[0].label).toBe('Jan 2026');
+    expect(ticks[0].label).toBe('M01');
     expect(ticks[0].widthWeeks).toBeCloseTo(31 / 7, 5);
-    expect(ticks[1].label).toBe('Feb 2026');
+    expect(ticks[1].label).toBe('M02');
     expect(ticks[1].widthWeeks).toBeCloseTo(28 / 7, 5); // 2026 is not a leap year
   });
 
@@ -23,10 +23,10 @@ describe('computeScaleTicks', () => {
   it('day/week ticks work with no start date at all', () => {
     const days = computeScaleTicks('day', { startDate: null, totalDurationWeeks: 1 });
     expect(days).toHaveLength(7);
-    expect(days[0].label).toBe('Day 1');
+    expect(days[0].label).toBe('D01');
 
     const weeks = computeScaleTicks('week', { startDate: null, totalDurationWeeks: 2 });
-    expect(weeks.map((t) => t.label)).toEqual(['Week 1', 'Week 2']);
+    expect(weeks.map((t) => t.label)).toEqual(['W01', 'W02']);
   });
 
   describe('sprint ticks', () => {
@@ -63,6 +63,17 @@ describe('computeScaleTicks', () => {
 
       expect(ticks[0].startOffsetWeeks).toBeCloseTo(4 / 7, 5); // Thu -> Mon is 4 days
     });
+  });
+});
+
+describe('isDayScaleReadable', () => {
+  it('is false when a day tick would render narrower than its own label', () => {
+    expect(isDayScaleReadable(4)).toBe(false); // zoom min
+    expect(isDayScaleReadable(24)).toBe(false); // zoom default
+  });
+
+  it('is true once a day tick has room for a 2-digit label', () => {
+    expect(isDayScaleReadable(200)).toBe(true); // zoom max
   });
 });
 

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
+import {
+  computeFinalSize,
+  computeTimeline,
+  isDayScaleReadable,
+  type PhaseUnit,
+  type ScaleUnit,
+  type TimelineInitiativeInput,
+} from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizingKeySelector from '../components/timeline/SizingKeySelector.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
@@ -9,6 +16,7 @@ import { toCSV } from '../lib/csv.js';
 import { downloadText } from '../lib/download.js';
 import { buildTimelineCsvRows, TIMELINE_COLUMNS } from '../lib/timelineExport.js';
 import { exportElementAsPdf } from '../lib/timelineScreenshot.js';
+import { useZoom } from '../hooks/useZoom.js';
 
 export default function TimelinePage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -21,6 +29,7 @@ export default function TimelinePage() {
   const [startDateOverride, setStartDateOverride] = useState<string>('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
+  const zoom = useZoom();
 
   useEffect(() => {
     if (project.data?.defaultSizingKeyId && sizingKeyId === null) {
@@ -164,6 +173,7 @@ export default function TimelinePage() {
             selected={headerScales}
             hasStartDate={!!startDate}
             hasSprintCadence={!!sprintCadence}
+            dayReadable={isDayScaleReadable(zoom.pixelsPerWeek)}
             onToggle={toggleScale}
           />
         </div>
@@ -180,6 +190,7 @@ export default function TimelinePage() {
             startDate={startDate}
             sprintCadence={sprintCadence}
             markers={markers}
+            zoom={zoom}
           />
         </div>
       )}

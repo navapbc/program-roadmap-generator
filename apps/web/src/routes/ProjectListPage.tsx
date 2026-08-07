@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { trpc } from '../trpc.js';
+import ImportProjectPanel from '../components/import/ImportProjectPanel.js';
 
 export default function ProjectListPage() {
   const utils = trpc.useUtils();
@@ -12,13 +13,14 @@ export default function ProjectListPage() {
     onSuccess: () => utils.project.list.invalidate(),
   });
   const [name, setName] = useState('');
+  const [showImport, setShowImport] = useState(false);
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-xl font-semibold text-slate-900 mb-4">Projects</h1>
 
       <form
-        className="flex gap-2 mb-6"
+        className="flex gap-2 mb-3"
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
@@ -39,7 +41,16 @@ export default function ProjectListPage() {
         >
           Create
         </button>
+        <button
+          type="button"
+          className="border border-slate-300 px-4 py-2 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50"
+          onClick={() => setShowImport((v) => !v)}
+        >
+          Import…
+        </button>
       </form>
+
+      {showImport && <ImportProjectPanel onDone={() => setShowImport(false)} />}
 
       {projects.isLoading && <p className="text-slate-500">Loading…</p>}
 

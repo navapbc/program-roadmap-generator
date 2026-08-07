@@ -3,6 +3,7 @@ import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type
 import { trpc } from '../../trpc.js';
 import GanttChart from '../timeline/GanttChart.js';
 import { captureElementAsPng } from '../../lib/timelineScreenshot.js';
+import { useZoom } from '../../hooks/useZoom.js';
 
 interface SizeLabel {
   id: string;
@@ -63,6 +64,7 @@ export default function ExportSizingKeySnapshot({
   const key = trpc.sizingKey.getFull.useQuery({ id: sizingKeyId });
   const containerRef = useRef<HTMLDivElement>(null);
   const hasCaptured = useRef(false);
+  const zoom = useZoom();
 
   const startDate = project.startDate ? new Date(project.startDate) : null;
 
@@ -126,6 +128,7 @@ export default function ExportSizingKeySnapshot({
         scales={project.timelineHeaderScales as ScaleUnit[]}
         startDate={startDate}
         sprintCadence={sprintCadence}
+        zoom={zoom}
       />
     </div>
   );

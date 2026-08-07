@@ -2,7 +2,7 @@ import type { ScaleUnit, SprintCadence } from '@roadmap/shared';
 import TimeScaleHeader from './TimeScaleHeader.js';
 import ZoomControl from './ZoomControl.js';
 import { MarkerLabelsRow, MarkerLines, type MarkerTick } from './TimelineMarkers.js';
-import { useZoom } from '../../hooks/useZoom.js';
+import type { useZoom } from '../../hooks/useZoom.js';
 
 const PHASE_COLORS = ['bg-indigo-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-violet-400'];
 const LABEL_COL_WIDTH = 224; // px, matches w-56
@@ -46,6 +46,7 @@ export default function GanttChart({
   startDate,
   sprintCadence,
   markers = [],
+  zoom,
 }: {
   result: TimelineResultDTO;
   milestoneBoundaries: MilestoneBoundary[];
@@ -53,8 +54,8 @@ export default function GanttChart({
   startDate: Date | null;
   sprintCadence?: SprintCadence | null;
   markers?: MarkerTick[];
+  zoom: ReturnType<typeof useZoom>;
 }) {
-  const zoom = useZoom();
   const phaseNames = [...new Set(result.rows.flatMap((r) => r.segments.map((s) => s.phaseName)))];
   const colorByPhase = new Map(phaseNames.map((name, i) => [name, PHASE_COLORS[i % PHASE_COLORS.length]]));
 

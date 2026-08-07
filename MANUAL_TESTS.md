@@ -131,6 +131,23 @@ passed once.
 - [ ] Scroll the chart horizontally; the Milestone/Initiative name column on the left should stay
       pinned (sticky) while the chart content scrolls underneath it.
 
+## Timeline header labels
+
+- [ ] Confirm compact label formats: Day → `D01`, `D02`, ...; Week → `W01`, `W02`, ...; Month →
+      `M01`...`M12` (calendar month number, no year — Year is its own separate row for that).
+      Sprint/Quarter/Year labels are unchanged from before.
+- [ ] Confirm Day tick labels are right-aligned within their column (flush to the right border), not
+      left-aligned like the other scales.
+- [ ] Zoom out until the Day header would render too narrow to show a 2-digit day number: confirm
+      the **Day** checkbox becomes unchecked and disabled (greyed out), with a "Zoom in to display
+      day labels" note beneath the checkbox row — on both the Timeline page and Combined Timeline.
+- [ ] Zoom back in past that threshold: confirm the Day checkbox re-enables and returns to whatever
+      checked/unchecked state it had before (it should not have lost the underlying preference while
+      disabled).
+- [ ] At intermediate zoom levels, confirm the `D` prefix can drop before the day number does — e.g.
+      a tick might show `01` without the `D` when there's only just enough room, rather than
+      truncating the number itself.
+
 ## Point-in-time date markers
 
 - [ ] On Project Settings, add a Key date (label + date) with the project's Start date set.
@@ -150,6 +167,25 @@ passed once.
 - [ ] Confirm markers and sprint cadence (when present on the relevant scope's project) render
       correctly offset within the shared axis.
 
+## Import
+
+- [ ] From the Projects list, click **Import…**, choose a previously-exported roadmap **CSV** file;
+      confirm it parses and shows an editable project-name field pre-filled from the file, plus a
+      row/milestone-count summary.
+- [ ] Repeat with a previously-exported roadmap **JSON** file; same result.
+- [ ] Import with the name field left as a name that **already exists**: confirm the import is
+      rejected with a message naming the collision, the parsed file/rows are **not** lost, and you
+      can edit the name field and resubmit without re-choosing the file.
+- [ ] Import with a new, unused name: confirm a **brand-new** project is created (the file's source
+      project, if it still exists, is untouched) and you're navigated to it.
+- [ ] Confirm the imported project's size labels, Milestones/Increments/Initiatives, and
+      Policy/Implementation sizes match the source file, in the same order.
+- [ ] Import a file where one row has both a size and a time-estimate value: confirm the import
+      still succeeds, the initiative keeps its size (not the estimate), and a warning is shown
+      listing that initiative by name.
+- [ ] Try a malformed file (e.g. missing a required column, or invalid JSON): confirm a clear error
+      is shown instead of a crash, and the file input can be retried.
+
 ## Sizing Key timeline preview
 
 - [ ] Open a Sizing Key's editor page and confirm the "Timeline preview" section shows one row per
@@ -166,6 +202,9 @@ passed once.
 - [ ] **Timeline CSV** (Timeline page → Export CSV): downloads one row per phase segment with
       `project, milestone, increment, initiative, phase, startDate, endDate`; confirm dates are real
       calendar dates when the project is anchored, or `Week N` when it isn't.
+  - [ ] **No overlap**: for a multi-phase Initiative, confirm each phase's `endDate` is the day
+        *before* the next phase's `startDate` (e.g. Discovery ends 9/2, Implementation starts 9/3) —
+        never the same calendar day.
 - [ ] **Timeline PDF** (Timeline page → Export PDF): downloads a PDF containing a snapshot of the
       Gantt chart (zoom controls should **not** appear in the image). Open the PDF and confirm it's
       legible.
