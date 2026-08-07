@@ -133,20 +133,42 @@ passed once.
 
 ## Timeline header labels
 
-- [ ] Confirm compact label formats: Day → `D01`, `D02`, ...; Week → `W01`, `W02`, ...; Month →
-      `M01`...`M12` (calendar month number, no year — Year is its own separate row for that).
-      Sprint/Quarter/Year labels are unchanged from before.
+- [ ] Confirm compact label formats: Day → `D01`, `D02`, ...; Week → `W01`, `W02`, ... . Sprint/Year
+      labels are unchanged.
+- [ ] With a project Start date set, confirm Month labels show the real calendar month name (`Jan`,
+      `Feb`, ...) with no year suffix — never the old `M01`-style numeric code.
+- [ ] With both **Quarter** and **Year** checked, confirm Quarter labels drop the year (`Q1`, not
+      `Q1 2027`). Uncheck Year (Quarter still checked): confirm Quarter labels now include the year
+      again (`Q1 2027`) so the date context isn't lost.
 - [ ] Confirm Day tick labels are right-aligned within their column (flush to the right border), not
       left-aligned like the other scales.
-- [ ] Zoom out until the Day header would render too narrow to show a 2-digit day number: confirm
-      the **Day** checkbox becomes unchecked and disabled (greyed out), with a "Zoom in to display
-      day labels" note beneath the checkbox row — on both the Timeline page and Combined Timeline.
-- [ ] Zoom back in past that threshold: confirm the Day checkbox re-enables and returns to whatever
+- [ ] Zoom out (or shrink the browser window — see "Responsive timeline width" below) until Day, then
+      Week, then Month would each render too narrow for their own label: confirm each becomes
+      unchecked and disabled (greyed out) in turn, coarsest-surviving-longest (Day disables first,
+      then Week, Month holds out the longest), with a "Zoom in to display \<scale\>[ and \<scale\>]
+      labels" note listing every currently-unreadable scale — on both the Timeline page and Combined
+      Timeline.
+- [ ] Zoom back in past each threshold: confirm the checkbox re-enables and returns to whatever
       checked/unchecked state it had before (it should not have lost the underlying preference while
       disabled).
-- [ ] At intermediate zoom levels, confirm the `D` prefix can drop before the day number does — e.g.
-      a tick might show `01` without the `D` when there's only just enough room, rather than
-      truncating the number itself.
+- [ ] At intermediate zoom levels, confirm the Day tick's `D` prefix can drop before the day number
+      does — e.g. a tick might show `01` without the `D` when there's only just enough room, rather
+      than truncating the number itself.
+
+## Responsive timeline width
+
+- [ ] Load a Timeline (or Combined Timeline) whose project has a moderate number of weeks. Confirm
+      the chart fills the available width edge-to-edge with no manual zooming and no scrollbar.
+- [ ] Resize the browser window narrower and wider (while below the app's ~1280px content cap):
+      confirm the chart continuously re-fits to the new width live, without needing a page reload.
+- [ ] Load a Timeline for a very long project (spanning several years). Confirm the chart holds at a
+      legible minimum scale rather than compressing bars/labels into illegible slivers, and that when
+      it can't fit, the **whole page** scrolls horizontally (not just a small box around the chart) —
+      check that the chart's white background and border extend across its *entire* width, with no
+      point where the background reverts to the page's own background color mid-chart.
+- [ ] Use the +/− zoom controls on a comfortably-fitting timeline: confirm zooming in intentionally
+      produces the same page-level horizontal scroll (rather than a locally-scrolling box), and Reset
+      returns to the auto-fit width.
 
 ## Point-in-time date markers
 

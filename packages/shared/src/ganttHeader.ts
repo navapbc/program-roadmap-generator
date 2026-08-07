@@ -1,8 +1,13 @@
 const DAYS_PER_WEEK = 7;
 const DAY_TICK_WIDTH_WEEKS = 1 / DAYS_PER_WEEK;
-// Below this a day tick renders narrower than its own 2-digit label needs —
+const WEEK_TICK_WIDTH_WEEKS = 1;
+// Real months vary 28-31 days; an average is precise enough for a coarse
+// "would this tick be legible" gate (the tick's own rendered width is
+// still computed from the real calendar boundary, never this average).
+const AVERAGE_MONTH_WEEKS = 30.44 / DAYS_PER_WEEK;
+// Below this a tick renders narrower than its own 2-digit label needs —
 // not just tight, the number gets truncated. Chosen for the 10px tick font.
-const MIN_DAY_TICK_PX = 14;
+const MIN_TICK_PX = 14;
 
 export type ScaleUnit = 'day' | 'week' | 'month' | 'sprint' | 'quarter' | 'year';
 
@@ -26,6 +31,8 @@ export interface ComputeScaleTicksOptions {
   startDate: Date | null;
   totalDurationWeeks: number;
   sprintCadence?: SprintCadence | null;
+  /** Every scale row currently shown, not just this one — lets a coarser row (e.g. Year) let a finer one (e.g. Quarter) drop redundant context from its own label. */
+  activeScales?: ScaleUnit[];
 }
 
 /** Calendar-anchored scales need a real start date to snap boundaries to. */
@@ -47,7 +54,31 @@ export function availableScales(hasStartDate: boolean, hasSprintCadence: boolean
 
 /** Whether a day tick, at this zoom level, is wide enough to fit its own label. */
 export function isDayScaleReadable(pixelsPerWeek: number): boolean {
-  return pixelsPerWeek * DAY_TICK_WIDTH_WEEKS >= MIN_DAY_TICK_PX;
+  return pixelsPerWeek * DAY_TICK_WIDTH_WEEKS >= MIN_TICK_PX;
+}
+
+/** Whether a week tick, at this zoom level, is wide enough to fit its own label. */
+export function isWeekScaleReadable(pixelsPerWeek: number): boolean {
+  return pixelsPerWeek * WEEK_TICK_WIDTH_WEEKS >= MIN_TICK_PX;
+}
+
+/** Whether a month tick, at this zoom level, is wide enough to fit its own label (using an average month width — real ticks vary, this is just the coarse gate). */
+export function isMonthScaleReadable(pixelsPerWeek: number): boolean {
+  return pixelsPerWeek * AVERAGE_MONTH_WEEKS >= MIN_TICK_PX;
+}
+
+/** Dispatches to the right readability check for whichever scales have one (day/week/month); scales with no fixed tick width (quarter/year/sprint) are always considered readable. */
+export function isScaleReadable(scale: ScaleUnit, pixelsPerWeek: number): boolean {
+  switch (scale) {
+    case 'day':
+      return isDayScaleReadable(pixelsPerWeek);
+    case 'week':
+      return isWeekScaleReadable(pixelsPerWeek);
+    case 'month':
+      return isMonthScaleReadable(pixelsPerWeek);
+    default:
+      return true;
+  }
 }
 
 // UTC-based throughout — a plain "2026-02-01" date-only value parses as UTC
@@ -81,6 +112,8 @@ function startOfNextQuarter(d: Date): Date {
 function startOfNextYear(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear() + 1, 0, 1));
 }
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function calendarTicks(
   startDate: Date,
@@ -177,7 +210,7 @@ function sprintTicks(startDate: Date, totalDurationWeeks: number, cadence: Sprin
  * that's intentional: it's what "real time, not averages" looks like.
  */
 export function computeScaleTicks(scale: ScaleUnit, opts: ComputeScaleTicksOptions): ScaleTick[] {
-  const { startDate, totalDurationWeeks, sprintCadence } = opts;
+  const { startDate, totalDurationWeeks, sprintCadence, activeScales } = opts;
 
   if (scaleRequiresStartDate(scale) && !startDate) {
     return [];
@@ -194,19 +227,20 @@ export function computeScaleTicks(scale: ScaleUnit, opts: ComputeScaleTicksOptio
     case 'sprint':
       return sprintTicks(startDate!, totalDurationWeeks, sprintCadence!);
     case 'month':
-      return calendarTicks(
-        startDate!,
-        totalDurationWeeks,
-        startOfNextMonth,
-        (d) => `M${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-      );
-    case 'quarter':
+      // Month is calendar-anchored by definition (scaleRequiresStartDate),
+      // so a real date is always available here — no numeric fallback like
+      // Day/Week ever needed, and the Year row (when shown) already
+      // supplies the year, so the name alone stays unambiguous either way.
+      return calendarTicks(startDate!, totalDurationWeeks, startOfNextMonth, (d) => MONTH_NAMES[d.getUTCMonth()]);
+    case 'quarter': {
+      const includeYear = !activeScales?.includes('year');
       return calendarTicks(
         startDate!,
         totalDurationWeeks,
         startOfNextQuarter,
-        (d) => `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`
+        (d) => `Q${Math.floor(d.getUTCMonth() / 3) + 1}${includeYear ? ` ${d.getUTCFullYear()}` : ''}`
       );
+    }
     case 'year':
       return calendarTicks(startDate!, totalDurationWeeks, startOfNextYear, (d) => `${d.getUTCFullYear()}`);
   }

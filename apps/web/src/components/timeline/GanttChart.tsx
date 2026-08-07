@@ -5,7 +5,7 @@ import { MarkerLabelsRow, MarkerLines, type MarkerTick } from './TimelineMarkers
 import type { useZoom } from '../../hooks/useZoom.js';
 
 const PHASE_COLORS = ['bg-indigo-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-violet-400'];
-const LABEL_COL_WIDTH = 224; // px, matches w-56
+export const LABEL_COL_WIDTH = 224; // px, matches w-56
 
 interface MilestoneBoundary {
   milestoneId: string;
@@ -75,8 +75,14 @@ export default function GanttChart({
         />
       </div>
 
-      <div className="border border-slate-200 rounded-md overflow-x-auto bg-white">
-        <div className="relative" style={{ width: LABEL_COL_WIDTH + chartWidth, minWidth: '100%' }}>
+      {/* Measurement-only wrapper: always the available width, so useZoom can fit
+          to it. The styled box below it is deliberately a sibling, not this same
+          element — it gets an explicit pixel width that can exceed its parent's
+          (that's what "fits, or else the page scrolls" needs), and a border/
+          background sized to match would be wrong to also put on the
+          measurement element, which must stay at 100% to measure correctly. */}
+      <div ref={zoom.containerRef}>
+        <div className="relative border border-slate-200 rounded-md bg-white" style={{ width: LABEL_COL_WIDTH + chartWidth, minWidth: '100%' }}>
           <div className="flex">
             <div
               className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50"
