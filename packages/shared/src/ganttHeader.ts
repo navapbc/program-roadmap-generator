@@ -1,4 +1,8 @@
 const DAYS_PER_WEEK = 7;
+const DAY_TICK_WIDTH_WEEKS = 1 / DAYS_PER_WEEK;
+// Below this a day tick renders narrower than its own 2-digit label needs —
+// not just tight, the number gets truncated. Chosen for the 10px tick font.
+const MIN_DAY_TICK_PX = 14;
 
 export type ScaleUnit = 'day' | 'week' | 'month' | 'sprint' | 'quarter' | 'year';
 
@@ -41,6 +45,11 @@ export function availableScales(hasStartDate: boolean, hasSprintCadence: boolean
   });
 }
 
+/** Whether a day tick, at this zoom level, is wide enough to fit its own label. */
+export function isDayScaleReadable(pixelsPerWeek: number): boolean {
+  return pixelsPerWeek * DAY_TICK_WIDTH_WEEKS >= MIN_DAY_TICK_PX;
+}
+
 // UTC-based throughout — a plain "2026-02-01" date-only value parses as UTC
 // midnight per spec, and this app treats dates as calendar values, not
 // precise instants. Local-time setters/getters (setMonth, getDate, ...)
@@ -73,10 +82,6 @@ function startOfNextYear(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear() + 1, 0, 1));
 }
 
-const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 function calendarTicks(
   startDate: Date,
   totalDurationWeeks: number,
@@ -99,13 +104,15 @@ function calendarTicks(
   return ticks;
 }
 
+// Zero-padded to 2 digits (D01, W01, ...) to keep the label short enough to
+// fit a narrow tick column; counts past 99 just grow wider rather than wrap.
 function countTicks(totalDurationWeeks: number, tickWidthWeeks: number, labelPrefix: string): ScaleTick[] {
   const count = Math.ceil(totalDurationWeeks / tickWidthWeeks);
   const ticks: ScaleTick[] = [];
   for (let i = 0; i < count; i++) {
     const startOffsetWeeks = i * tickWidthWeeks;
     const widthWeeks = Math.min(tickWidthWeeks, totalDurationWeeks - startOffsetWeeks);
-    ticks.push({ label: `${labelPrefix} ${i + 1}`, startOffsetWeeks, widthWeeks });
+    ticks.push({ label: `${labelPrefix}${String(i + 1).padStart(2, '0')}`, startOffsetWeeks, widthWeeks });
   }
   return ticks;
 }
@@ -181,9 +188,9 @@ export function computeScaleTicks(scale: ScaleUnit, opts: ComputeScaleTicksOptio
 
   switch (scale) {
     case 'day':
-      return countTicks(totalDurationWeeks, 1 / DAYS_PER_WEEK, 'Day');
+      return countTicks(totalDurationWeeks, DAY_TICK_WIDTH_WEEKS, 'D');
     case 'week':
-      return countTicks(totalDurationWeeks, 1, 'Week');
+      return countTicks(totalDurationWeeks, 1, 'W');
     case 'sprint':
       return sprintTicks(startDate!, totalDurationWeeks, sprintCadence!);
     case 'month':
@@ -191,7 +198,7 @@ export function computeScaleTicks(scale: ScaleUnit, opts: ComputeScaleTicksOptio
         startDate!,
         totalDurationWeeks,
         startOfNextMonth,
-        (d) => `${MONTH_NAMES[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+        (d) => `M${String(d.getUTCMonth() + 1).padStart(2, '0')}`
       );
     case 'quarter':
       return calendarTicks(

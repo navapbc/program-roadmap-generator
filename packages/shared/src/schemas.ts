@@ -151,6 +151,29 @@ export const computeTimelineInputSchema = z.object({
   startDateOverride: z.coerce.date().nullable().optional(),
 });
 
+/**
+ * One row per initiative, mirroring RoadmapRow's own field set minus
+ * `project` (the target project name is a separate top-level field, since
+ * import always creates a fresh project rather than reading it per-row) and
+ * `finalSize` (always recomputed, never imported). Every field arrives as a
+ * string, matching how both the CSV and JSON roadmap export always encode
+ * it — numbers-as-strings for timeEstimateWeeks included.
+ */
+export const importRoadmapRowSchema = z.object({
+  milestone: z.string().min(1),
+  increment: z.string().min(1),
+  initiative: z.string().min(1),
+  policySize: z.string().optional(),
+  implementationSize: z.string().optional(),
+  timeEstimateWeeks: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const importRoadmapSchema = z.object({
+  name: z.string().min(1),
+  rows: z.array(importRoadmapRowSchema).min(1),
+});
+
 export const createTimelineMarkerSchema = z.object({
   projectId: idSchema,
   label: z.string().min(1),

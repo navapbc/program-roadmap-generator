@@ -9,7 +9,14 @@ interface Label {
 
 export default function SizingKeyLabelEditor({ sizingKeyId, labels }: { sizingKeyId: string; labels: Label[] }) {
   const utils = trpc.useUtils();
-  const invalidate = () => utils.sizingKey.getFull.invalidate({ id: sizingKeyId });
+  // A label add/rename/delete/reorder changes this key's compatibility for
+  // every project, not just the one being edited right now — invalidate
+  // listWithCompatibility with no projectId filter so it clears the cache
+  // for all of them, not only whichever project happens to be open.
+  const invalidate = () => {
+    utils.sizingKey.getFull.invalidate({ id: sizingKeyId });
+    utils.sizingKey.listWithCompatibility.invalidate();
+  };
   const addLabel = trpc.sizingKey.addLabel.useMutation({ onSuccess: invalidate, onError: (e) => alert(e.message) });
   const renameLabel = trpc.sizingKey.renameLabel.useMutation({ onSuccess: invalidate });
   const deleteLabel = trpc.sizingKey.deleteLabel.useMutation({ onSuccess: invalidate });

@@ -1,10 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
+import {
+  computeFinalSize,
+  computeTimeline,
+  isDayScaleReadable,
+  type PhaseUnit,
+  type ScaleUnit,
+  type TimelineInitiativeInput,
+} from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizingKeySelector from '../components/timeline/SizingKeySelector.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
 import GanttChart from '../components/timeline/GanttChart.js';
+import { toCSV } from '../lib/csv.js';
+import { downloadText } from '../lib/download.js';
+import { buildTimelineCsvRows, TIMELINE_COLUMNS } from '../lib/timelineExport.js';
+import { exportElementAsPdf } from '../lib/timelineScreenshot.js';
+import { useZoom } from '../hooks/useZoom.js';
 
 export default function TimelinePage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -15,6 +27,9 @@ export default function TimelinePage() {
 
   const [sizingKeyId, setSizingKeyId] = useState<string | null>(null);
   const [startDateOverride, setStartDateOverride] = useState<string>('');
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const zoom = useZoom();
 
   useEffect(() => {
     if (project.data?.defaultSizingKeyId && sizingKeyId === null) {
@@ -94,6 +109,22 @@ export default function TimelinePage() {
         }))
       : [];
 
+  function exportTimelineCsv() {
+    if (!timeline) return;
+    const rows = buildTimelineCsvRows(data.name, data.milestones, timeline.result);
+    downloadText(`${data.name}-timeline.csv`, 'text/csv', toCSV(rows, TIMELINE_COLUMNS));
+  }
+
+  async function exportTimelinePdf() {
+    if (!chartRef.current) return;
+    setIsExportingPdf(true);
+    try {
+      await exportElementAsPdf(chartRef.current, `${data.name}-timeline.pdf`, `${data.name} — Timeline`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -103,6 +134,21 @@ export default function TimelinePage() {
           </Link>
           <h1 className="text-xl font-semibold text-slate-900">Timeline</h1>
         </div>
+        {timeline && (
+          <div className="flex gap-3 text-sm">
+            <button className="text-slate-500 hover:text-slate-900" type="button" onClick={exportTimelineCsv}>
+              Export CSV
+            </button>
+            <button
+              className="text-slate-500 hover:text-slate-900 disabled:opacity-50"
+              type="button"
+              onClick={exportTimelinePdf}
+              disabled={isExportingPdf}
+            >
+              {isExportingPdf ? 'Exporting…' : 'Export PDF'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-end gap-6 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-md">
@@ -127,6 +173,7 @@ export default function TimelinePage() {
             selected={headerScales}
             hasStartDate={!!startDate}
             hasSprintCadence={!!sprintCadence}
+            dayReadable={isDayScaleReadable(zoom.pixelsPerWeek)}
             onToggle={toggleScale}
           />
         </div>
@@ -135,14 +182,17 @@ export default function TimelinePage() {
       {!sizingKeyId && <p className="text-slate-400">Choose a sizing key to generate the timeline.</p>}
 
       {timeline && (
-        <GanttChart
-          result={timeline.result}
-          milestoneBoundaries={timeline.milestoneBoundaries}
-          scales={headerScales}
-          startDate={startDate}
-          sprintCadence={sprintCadence}
-          markers={markers}
-        />
+        <div ref={chartRef}>
+          <GanttChart
+            result={timeline.result}
+            milestoneBoundaries={timeline.milestoneBoundaries}
+            scales={headerScales}
+            startDate={startDate}
+            sprintCadence={sprintCadence}
+            markers={markers}
+            zoom={zoom}
+          />
+        </div>
       )}
     </div>
   );

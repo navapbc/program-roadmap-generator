@@ -1,6 +1,10 @@
 import { Link, useParams } from 'react-router-dom';
 import { trpc } from '../trpc.js';
 import MilestoneColumn from '../components/hierarchy/MilestoneColumn.js';
+import { toCSV } from '../lib/csv.js';
+import { downloadText } from '../lib/download.js';
+import { buildRoadmapRows, ROADMAP_COLUMNS } from '../lib/roadmapExport.js';
+import ExportWorkbookButton from '../components/export/ExportWorkbookButton.js';
 
 export default function ProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -12,6 +16,16 @@ export default function ProjectPage() {
   if (!project.data) return <p className="text-red-500">Project not found.</p>;
 
   const { data } = project;
+
+  function exportCSV() {
+    const rows = buildRoadmapRows(data);
+    downloadText(`${data.name}-roadmap.csv`, 'text/csv', toCSV(rows, ROADMAP_COLUMNS));
+  }
+
+  function exportJSON() {
+    const rows = buildRoadmapRows(data);
+    downloadText(`${data.name}-roadmap.json`, 'application/json', JSON.stringify(rows, null, 2));
+  }
 
   return (
     <div>
@@ -27,6 +41,13 @@ export default function ProjectPage() {
           <Link to={`/projects/${data.id}/timeline`} className="text-slate-500 hover:text-slate-900">
             Timeline
           </Link>
+          <button className="text-slate-500 hover:text-slate-900" type="button" onClick={exportCSV}>
+            Export CSV
+          </button>
+          <button className="text-slate-500 hover:text-slate-900" type="button" onClick={exportJSON}>
+            Export JSON
+          </button>
+          <ExportWorkbookButton project={data} />
         </div>
       </div>
 

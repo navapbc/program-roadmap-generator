@@ -2,7 +2,7 @@ import type { ScaleUnit, SprintCadence } from '@roadmap/shared';
 import TimeScaleHeader from './TimeScaleHeader.js';
 import ZoomControl from './ZoomControl.js';
 import { MarkerLabelsRow, MarkerLines, type MarkerTick } from './TimelineMarkers.js';
-import { useZoom } from '../../hooks/useZoom.js';
+import type { useZoom } from '../../hooks/useZoom.js';
 
 const PHASE_COLORS = ['bg-indigo-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-violet-400'];
 const WEEKS_PER_DAY = 1 / 7;
@@ -58,12 +58,12 @@ function weeksBetween(a: Date, b: Date): number {
 export default function CombinedTimelineView({
   groups,
   scales,
+  zoom,
 }: {
   groups: CombinedScopeGroup[];
   scales: ScaleUnit[];
+  zoom: ReturnType<typeof useZoom>;
 }) {
-  const zoom = useZoom();
-
   if (groups.length === 0) return null;
 
   const sharedOrigin = computeSharedOrigin(groups);
@@ -94,7 +94,7 @@ export default function CombinedTimelineView({
 
   return (
     <div>
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-end mb-2 no-export">
         <ZoomControl
           onZoomIn={zoom.zoomIn}
           onZoomOut={zoom.zoomOut}

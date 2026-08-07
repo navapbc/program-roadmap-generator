@@ -12,6 +12,9 @@ export default function SizeLabelEditor({ projectId, labels }: { projectId: stri
   const invalidate = () => {
     utils.project.getById.invalidate();
     utils.sizeLabel.listForProject.invalidate({ projectId });
+    // Changing this project's own label set changes which sizing keys are
+    // compatible with it — clear the cached compatibility list too.
+    utils.sizingKey.listWithCompatibility.invalidate({ projectId });
   };
   const create = trpc.sizeLabel.create.useMutation({ onSuccess: invalidate });
   const rename = trpc.sizeLabel.rename.useMutation({ onSuccess: invalidate });

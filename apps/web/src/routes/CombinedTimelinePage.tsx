@@ -1,9 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
-import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
+import {
+  computeFinalSize,
+  computeTimeline,
+  isDayScaleReadable,
+  type PhaseUnit,
+  type ScaleUnit,
+  type TimelineInitiativeInput,
+} from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizingKeySelector from '../components/timeline/SizingKeySelector.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
 import CombinedTimelineView, { type CombinedScopeGroup } from '../components/timeline/CombinedTimelineView.js';
+import { useZoom } from '../hooks/useZoom.js';
 
 interface Scope {
   localId: string;
@@ -18,6 +26,7 @@ export default function CombinedTimelinePage() {
   const nextId = useRef(0);
   const [scopes, setScopes] = useState<Scope[]>([]);
   const [scales, setScales] = useState<ScaleUnit[]>(DEFAULT_SCALES);
+  const zoom = useZoom();
 
   const projects = trpc.project.list.useQuery();
 
@@ -131,11 +140,17 @@ export default function CombinedTimelinePage() {
       {scopes.length > 0 && (
         <div className="mb-4">
           <label className="block text-xs font-medium text-slate-500 mb-1">Header scales</label>
-          <ScaleToggleList selected={scales} hasStartDate={hasStartDate} hasSprintCadence={hasSprintCadence} onToggle={toggleScale} />
+          <ScaleToggleList
+            selected={scales}
+            hasStartDate={hasStartDate}
+            hasSprintCadence={hasSprintCadence}
+            dayReadable={isDayScaleReadable(zoom.pixelsPerWeek)}
+            onToggle={toggleScale}
+          />
         </div>
       )}
 
-      {groups.length > 0 && <CombinedTimelineView groups={groups} scales={scales} />}
+      {groups.length > 0 && <CombinedTimelineView groups={groups} scales={scales} zoom={zoom} />}
     </div>
   );
 }
