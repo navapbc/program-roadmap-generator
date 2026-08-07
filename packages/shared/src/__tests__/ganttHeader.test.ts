@@ -1,17 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { availableScales, computeScaleTicks, isDayScaleReadable, SCALE_DISPLAY_ORDER } from '../ganttHeader.js';
+import {
+  availableScales,
+  computeScaleTicks,
+  isDayScaleReadable,
+  isMonthScaleReadable,
+  isWeekScaleReadable,
+  SCALE_DISPLAY_ORDER,
+} from '../ganttHeader.js';
 
 describe('computeScaleTicks', () => {
-  it('month ticks snap to real calendar boundaries, not a flat average', () => {
+  it('month ticks snap to real calendar boundaries, not a flat average, and use real month names', () => {
     const ticks = computeScaleTicks('month', {
       startDate: new Date('2026-01-01T00:00:00Z'),
       totalDurationWeeks: 12,
     });
 
-    expect(ticks[0].label).toBe('M01');
+    expect(ticks[0].label).toBe('Jan');
     expect(ticks[0].widthWeeks).toBeCloseTo(31 / 7, 5);
-    expect(ticks[1].label).toBe('M02');
+    expect(ticks[1].label).toBe('Feb');
     expect(ticks[1].widthWeeks).toBeCloseTo(28 / 7, 5); // 2026 is not a leap year
+  });
+
+  it('quarter ticks include the year unless Year is also shown', () => {
+    const opts = { startDate: new Date('2026-01-01T00:00:00Z'), totalDurationWeeks: 12 };
+    expect(computeScaleTicks('quarter', opts)[0].label).toBe('Q1 2026');
+    expect(computeScaleTicks('quarter', { ...opts, activeScales: ['week'] })[0].label).toBe('Q1 2026');
+    expect(computeScaleTicks('quarter', { ...opts, activeScales: ['year', 'quarter'] })[0].label).toBe('Q1');
   });
 
   it('returns no ticks for calendar scales when unanchored', () => {
@@ -74,6 +88,24 @@ describe('isDayScaleReadable', () => {
 
   it('is true once a day tick has room for a 2-digit label', () => {
     expect(isDayScaleReadable(200)).toBe(true); // zoom max
+  });
+});
+
+describe('isWeekScaleReadable', () => {
+  it('is false when a week tick would render narrower than its own label', () => {
+    expect(isWeekScaleReadable(4)).toBe(false); // zoom min
+  });
+
+  it('is true once a week tick has room for a 2-digit label', () => {
+    expect(isWeekScaleReadable(24)).toBe(true); // zoom default
+    expect(isWeekScaleReadable(200)).toBe(true); // zoom max
+  });
+});
+
+describe('isMonthScaleReadable', () => {
+  it('is true across the whole zoom range — a month tick is wide even at the zoom floor', () => {
+    expect(isMonthScaleReadable(4)).toBe(true); // zoom min
+    expect(isMonthScaleReadable(24)).toBe(true); // zoom default
   });
 });
 

@@ -1,17 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import {
-  computeFinalSize,
-  computeTimeline,
-  isDayScaleReadable,
-  type PhaseUnit,
-  type ScaleUnit,
-  type TimelineInitiativeInput,
-} from '@roadmap/shared';
+import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizingKeySelector from '../components/timeline/SizingKeySelector.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
-import GanttChart from '../components/timeline/GanttChart.js';
+import GanttChart, { LABEL_COL_WIDTH } from '../components/timeline/GanttChart.js';
 import { toCSV } from '../lib/csv.js';
 import { downloadText } from '../lib/download.js';
 import { buildTimelineCsvRows, TIMELINE_COLUMNS } from '../lib/timelineExport.js';
@@ -29,7 +22,6 @@ export default function TimelinePage() {
   const [startDateOverride, setStartDateOverride] = useState<string>('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
-  const zoom = useZoom();
 
   useEffect(() => {
     if (project.data?.defaultSizingKeyId && sizingKeyId === null) {
@@ -82,6 +74,8 @@ export default function TimelinePage() {
     // startDate is derived fresh from startDateOverride each render on purpose —
     // this whole block must re-run with zero network calls on every keystroke/toggle.
   }, [project.data, selectedKey.data, startDateOverride]);
+
+  const zoom = useZoom(timeline?.result.totalDurationWeeks || 1, LABEL_COL_WIDTH);
 
   if (project.isLoading) return <p className="text-slate-500">Loading…</p>;
   if (!project.data) return <p className="text-red-500">Project not found.</p>;
@@ -173,7 +167,7 @@ export default function TimelinePage() {
             selected={headerScales}
             hasStartDate={!!startDate}
             hasSprintCadence={!!sprintCadence}
-            dayReadable={isDayScaleReadable(zoom.pixelsPerWeek)}
+            pixelsPerWeek={zoom.pixelsPerWeek}
             onToggle={toggleScale}
           />
         </div>

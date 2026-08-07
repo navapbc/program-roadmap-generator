@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
 import { trpc } from '../../trpc.js';
-import GanttChart from '../timeline/GanttChart.js';
+import GanttChart, { LABEL_COL_WIDTH } from '../timeline/GanttChart.js';
 import { captureElementAsPng } from '../../lib/timelineScreenshot.js';
 import { useZoom } from '../../hooks/useZoom.js';
 
@@ -62,9 +62,8 @@ export default function ExportSizingKeySnapshot({
   onCaptured: (result: CapturedSnapshot) => void;
 }) {
   const key = trpc.sizingKey.getFull.useQuery({ id: sizingKeyId });
-  const containerRef = useRef<HTMLDivElement>(null);
+  const captureRef = useRef<HTMLDivElement>(null);
   const hasCaptured = useRef(false);
-  const zoom = useZoom();
 
   const startDate = project.startDate ? new Date(project.startDate) : null;
 
@@ -96,12 +95,14 @@ export default function ExportSizingKeySnapshot({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key.data]);
 
+  const zoom = useZoom(timeline?.result.totalDurationWeeks || 1, LABEL_COL_WIDTH);
+
   useEffect(() => {
-    if (!timeline || !containerRef.current || hasCaptured.current || !key.data) return;
+    if (!timeline || !captureRef.current || hasCaptured.current || !key.data) return;
     hasCaptured.current = true;
     requestAnimationFrame(() => {
       setTimeout(async () => {
-        const png = await captureElementAsPng(containerRef.current!);
+        const png = await captureElementAsPng(captureRef.current!);
         onCaptured({
           ...png,
           name: key.data!.name,
@@ -121,7 +122,7 @@ export default function ExportSizingKeySnapshot({
       : null;
 
   return (
-    <div ref={containerRef} style={{ width: 1100 }}>
+    <div ref={captureRef} style={{ width: 1100 }}>
       <GanttChart
         result={timeline.result}
         milestoneBoundaries={timeline.milestoneBoundaries}

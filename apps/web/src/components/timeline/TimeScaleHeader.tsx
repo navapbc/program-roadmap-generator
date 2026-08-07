@@ -1,4 +1,4 @@
-import { computeScaleTicks, isDayScaleReadable, SCALE_DISPLAY_ORDER, type ScaleUnit, type SprintCadence } from '@roadmap/shared';
+import { computeScaleTicks, isScaleReadable, SCALE_DISPLAY_ORDER, type ScaleUnit, type SprintCadence } from '@roadmap/shared';
 
 export default function TimeScaleHeader({
   scales,
@@ -17,17 +17,16 @@ export default function TimeScaleHeader({
 
   // Stack rows coarsest-to-finest always, regardless of what order the
   // scales were toggled on in — a checkbox history shouldn't reorder the
-  // ruler. Day is additionally suppressed outright once it's too zoomed out
-  // to fit its own label — enforced here so every caller gets it for free,
-  // independent of whether the page above even offers a Day checkbox.
-  const orderedScales = SCALE_DISPLAY_ORDER.filter(
-    (s) => scales.includes(s) && (s !== 'day' || isDayScaleReadable(pixelsPerWeek))
-  );
+  // ruler. Day/Week/Month are additionally suppressed outright once too
+  // zoomed out to fit their own label — enforced here so every caller gets
+  // it for free, independent of whether the page above even offers the
+  // corresponding checkbox.
+  const orderedScales = SCALE_DISPLAY_ORDER.filter((s) => scales.includes(s) && isScaleReadable(s, pixelsPerWeek));
 
   return (
     <div className="border-b border-slate-200">
       {orderedScales.map((scale) => {
-        const ticks = computeScaleTicks(scale, { startDate, totalDurationWeeks, sprintCadence });
+        const ticks = computeScaleTicks(scale, { startDate, totalDurationWeeks, sprintCadence, activeScales: orderedScales });
         if (ticks.length === 0) return null;
         return (
           <div key={scale} className="relative h-6 border-t border-slate-100 first:border-t-0">
