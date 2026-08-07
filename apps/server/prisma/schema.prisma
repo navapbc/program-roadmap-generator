@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id                   String   @id @default(cuid())
+  name                 String
+  description          String?
+  startDate            DateTime?
+  defaultSizingKeyId   String?
+  timelineHeaderScales String   @default("[\"month\",\"week\"]")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  defaultSizingKey SizingKey?  @relation(fields: [defaultSizingKeyId], references: [id], onDelete: SetNull)
+  sizeLabels       SizeLabel[]
+  milestones       Milestone[]
+}
+
+model SizeLabel {
+  id         String @id @default(cuid())
+  projectId  String
+  code       String
+  orderIndex Int
+
+  project                     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  initiativesAsPolicy         Initiative[] @relation("InitiativePolicySize")
+  initiativesAsImplementation Initiative[] @relation("InitiativeImplementationSize")
+
+  @@unique([projectId, code])
+  @@unique([projectId, orderIndex])
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  orderKey    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  increments Increment[]
+
+  @@index([projectId])
+}
+
+model Increment {
+  id          String   @id @default(cuid())
+  milestoneId String
+  name        String
+  description String?
+  orderKey    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  milestone   Milestone    @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  initiatives Initiative[]
+
+  @@index([milestoneId])
+}
+
+model Initiative {
+  id                         String    @id @default(cuid())
+  incrementId                String
+  name                       String
+  orderKey                   String
+  policySizeLabelId          String?
+  implementationSizeLabelId  String?
+  timeEstimateWeeks          Float?
+  notes                      String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  increment              Increment  @relation(fields: [incrementId], references: [id], onDelete: Cascade)
+  policySizeLabel        SizeLabel? @relation("InitiativePolicySize", fields: [policySizeLabelId], references: [id], onDelete: SetNull)
+  implementationSizeLabel SizeLabel? @relation("InitiativeImplementationSize", fields: [implementationSizeLabelId], references: [id], onDelete: SetNull)
+
+  @@index([incrementId])
+}
+
+model SizingKey {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  labels   SizingKeyLabel[]
+  phases   SizingPhase[]
+  projects Project[]
+}
+
+model SizingKeyLabel {
+  id          String @id @default(cuid())
+  sizingKeyId String
+  code        String
+  orderIndex  Int
+
+  sizingKey SizingKey @relation(fields: [sizingKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([sizingKeyId, code])
+  @@unique([sizingKeyId, orderIndex])
+}
+
+model SizingPhase {
+  id          String @id @default(cuid())
+  sizingKeyId String
+  name        String
+  // 'day' | 'week' | 'month' — plain string + app-level Zod validation
+  // rather than a Prisma enum, kept consistent with the mutual-exclusivity
+  // CHECK constraint pattern used elsewhere for SQLite.
+  unit        String
+  orderIndex  Int
+
+  sizingKey SizingKey        @relation(fields: [sizingKeyId], references: [id], onDelete: Cascade)
+  durations SizingDuration[]
+
+  @@unique([sizingKeyId, orderIndex])
+}
+
+model SizingDuration {
+  id             String @id @default(cuid())
+  sizingPhaseId  String
+  labelCode      String
+  durationValue  Float
+
+  sizingPhase SizingPhase @relation(fields: [sizingPhaseId], references: [id], onDelete: Cascade)
+
+  @@unique([sizingPhaseId, labelCode])
+}
