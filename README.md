@@ -15,6 +15,8 @@ never uploaded anywhere.
 - Size initiatives separately for policy work and implementation work
 - Generate a visual timeline (Gantt chart) with configurable units
 - Set a program start date and sprint cadence
+- Add named date markers (such as a target launch) as vertical lines on the timeline
+- Zoom in and out to change how much of the timeline is visible at once
 - View a combined timeline across multiple projects
 
 ---
