@@ -122,6 +122,10 @@ passed once.
         re-checking it last; it should still render above Week.
 - [ ] Confirm a time-estimate Initiative renders as a single unphased block, and an unsized
       Initiative is flagged without breaking the sequencing of the initiatives after it.
+- [ ] Give an Initiative a long name (long enough to need 2-3 lines at the label column's width);
+      confirm it wraps in full within the label column (row grows taller to fit) rather than being
+      cut off with an ellipsis, and its phase bar stays vertically centered in the taller row. Check
+      this on both the Timeline page and Combined Timeline.
 
 ## Zoom & readability
 

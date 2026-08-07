@@ -109,28 +109,30 @@ export default function GanttChart({
                   <div style={{ width: chartWidth }} />
                 </div>
                 {rows.map((row) => (
-                  <div key={row.initiativeId} className="flex border-t border-slate-100 items-center">
+                  <div key={row.initiativeId} className="flex border-t border-slate-100">
                     <div
-                      className="sticky left-0 z-20 flex-shrink-0 px-3 py-2 text-sm text-slate-800 truncate flex items-center gap-1 bg-white"
+                      className="sticky left-0 z-20 flex-shrink-0 px-3 py-2 text-sm text-slate-800 flex items-start gap-1 bg-white"
                       style={{ width: LABEL_COL_WIDTH }}
-                      title={row.name}
                     >
-                      {row.name}
+                      <span className="min-w-0 break-words">{row.name}</span>
                       {row.warning === 'missing-size' && (
-                        <span className="text-[10px] text-amber-600 bg-amber-50 px-1 rounded" title="No size or time estimate set">
+                        <span
+                          className="shrink-0 text-[10px] text-amber-600 bg-amber-50 px-1 rounded"
+                          title="No size or time estimate set"
+                        >
                           unsized
                         </span>
                       )}
                       {row.warning === 'missing-duration' && (
                         <span
-                          className="text-[10px] text-red-600 bg-red-50 px-1 rounded"
+                          className="shrink-0 text-[10px] text-red-600 bg-red-50 px-1 rounded"
                           title="Sizing key is missing a duration for this initiative's size"
                         >
                           missing data
                         </span>
                       )}
                     </div>
-                    <div className="relative h-8" style={{ width: chartWidth }}>
+                    <div className="relative h-8 self-center" style={{ width: chartWidth }}>
                       {row.segments.map((seg, i) => (
                         <div
                           key={i}
