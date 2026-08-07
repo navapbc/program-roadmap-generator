@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "setup": "npm install && npm run env:init && npm run db:migrate && npm run db:generate && npm run seed",
-    "env:init": "cp -n .env.example apps/server/.env 2>/dev/null || true",
+    "env:init": "cp -n .env.example .env 2>/dev/null || true",
     "db:migrate": "npm run migrate:deploy --workspace apps/server",
     "db:generate": "npm run generate --workspace apps/server",
     "db:reset": "npm run reset --workspace apps/server && npm run seed",
@@ -17,6 +17,7 @@
     "seed": "npm run seed --workspace apps/server"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "dotenv-cli": "^11.0.0"
   }
 }

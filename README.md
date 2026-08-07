@@ -173,6 +173,21 @@ To wipe everything and start over with fresh sample data:
 npm run db:reset
 ```
 
+## Changing the ports
+
+By default the app uses address 5173 for the page you open, and 4000 behind the scenes. If either is
+already taken — often because you are running a second copy of this app — open the file named `.env`
+in the `program-roadmap-generator` folder and change these two lines to any numbers between 1024 and
+65535:
+
+```
+API_PORT=4400
+WEB_PORT=5273
+```
+
+Save the file, stop the app with `Ctrl + C`, and start it again with `npm run dev`. You would then
+open http://localhost:5273 instead. No other changes are needed.
+
 ---
 
 # Troubleshooting
@@ -185,6 +200,9 @@ newly opened windows.
 The app is already running in another Terminal window. Switch to that window and press `Ctrl + C`,
 or close all Terminal windows and start again. This matters: the web page may still load while the
 data service is not actually running, which makes the app look broken.
+
+If something unrelated is using those ports and you cannot stop it, change the ports instead — see
+"Changing the ports" below.
 
 **The page loads but is blank, or shows errors about loading data**
 The web page and the data service are two separate pieces, and both must be running. Look at the
@@ -217,9 +235,9 @@ owner. The exact error text is the useful part.
 
 npm workspaces monorepo:
 
-- `apps/server` — Fastify + tRPC API, Prisma ORM over SQLite. Runs on port **4000**.
-- `apps/web` — React 18 + Vite + Tailwind + TanStack Query. Runs on port **5173** and proxies
-  `/trpc` to port 4000 (see `apps/web/vite.config.ts`).
+- `apps/server` — Fastify + tRPC API, Prisma ORM over SQLite. Listens on `API_PORT` (default 4000).
+- `apps/web` — React 18 + Vite + Tailwind + TanStack Query. Serves on `WEB_PORT` (default 5173) and
+  proxies `/trpc` to `API_PORT` (see `apps/web/vite.config.ts`).
 - `packages/shared` — types, Zod schemas, and sizing/timeline logic shared by both, tested with Vitest.
 
 Ordering of milestones, increments, and initiatives uses fractional indexing (`orderKey`) so drag
@@ -252,14 +270,26 @@ In `apps/server`:
 
 ## Environment
 
-`apps/server/.env` is created from `.env.example` by `npm run setup`:
+A single `.env` at the repository root configures everything. `npm run setup` creates it from
+`.env.example`:
 
-- `DATABASE_URL` — SQLite path, relative to `apps/server/prisma/`
-- `PORT` — API port, defaults to `4000`
+- `DATABASE_URL` — SQLite path, resolved relative to `apps/server/prisma/`
+- `API_PORT` — port the API listens on, defaults to `4000`
+- `WEB_PORT` — port the web app serves on, defaults to `5173`
 
-Note that the server has no `dotenv` dependency. These variables reach the process because Prisma
-Client loads `.env` when it initializes. Changing `PORT` also requires updating the proxy target in
-`apps/web/vite.config.ts`, which is hardcoded to `http://localhost:4000`.
+How each piece reads it:
+
+- The server loads it explicitly in `apps/server/src/env.ts`, which **must be imported first** in any
+  entry point because Prisma Client reads `DATABASE_URL` when it is constructed. `index.ts` and
+  `prisma/seed.ts` both do this.
+- Vite reads it with `loadEnv` in `apps/web/vite.config.ts` to set the dev server port and proxy
+  target. Keys are read without the `VITE_` prefix and are never exposed to the browser.
+- Prisma CLI commands are wrapped in `dotenv -e ../../.env` because Prisma only looks for `.env`
+  beside its schema, not at the repo root.
+
+The file is authoritative: `env.ts` loads it with `override: true`, so values in `.env` win over
+variables already set in the shell. To use a different port, edit `.env` rather than exporting a
+shell variable.
 
 `.env` files and `*.db` files are gitignored and must never be committed.
 
@@ -267,7 +297,10 @@ Client loads `.env` when it initializes. Changing `PORT` also requires updating 
 
 ```bash
 cd apps/server
-npx prisma migrate dev --name your_change_name
+npm run migrate -- --name your_change_name
 ```
+
+Use the `migrate` script rather than calling `npx prisma` directly — the script wraps Prisma in
+`dotenv -e ../../.env` so it picks up the root config.
 
 Commit the generated folder under `apps/server/prisma/migrations/`.

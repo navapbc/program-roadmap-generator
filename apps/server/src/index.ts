@@ -1,3 +1,5 @@
+// Must come first: loads the root .env before Prisma Client reads DATABASE_URL.
+import { apiPort } from './env.js';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
@@ -13,8 +15,7 @@ async function main() {
     trpcOptions: { router: appRouter, createContext },
   });
 
-  const port = Number(process.env.PORT ?? 4000);
-  await server.listen({ port, host: '0.0.0.0' });
+  await server.listen({ port: apiPort, host: '0.0.0.0' });
 }
 
 main().catch((err) => {

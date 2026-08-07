@@ -1,3 +1,5 @@
+// Must come first: loads the root .env before Prisma Client reads DATABASE_URL.
+import '../src/env.js';
 import { PrismaClient } from '@prisma/client';
 import { initialOrderKeys } from '@roadmap/shared';
 
