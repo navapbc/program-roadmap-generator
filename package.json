@@ -6,6 +6,11 @@
     "apps/*"
   ],
   "scripts": {
+    "setup": "npm install && npm run env:init && npm run db:migrate && npm run db:generate && npm run seed",
+    "env:init": "cp -n .env.example apps/server/.env 2>/dev/null || true",
+    "db:migrate": "npm run migrate:deploy --workspace apps/server",
+    "db:generate": "npm run generate --workspace apps/server",
+    "db:reset": "npm run reset --workspace apps/server && npm run seed",
     "dev": "concurrently -n server,web -c blue,green \"npm run dev --workspace apps/server\" \"npm run dev --workspace apps/web\"",
     "build": "npm run build --workspace packages/shared && npm run build --workspace apps/server && npm run build --workspace apps/web",
     "test": "npm run test --workspace packages/shared",
