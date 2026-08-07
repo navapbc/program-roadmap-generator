@@ -7,6 +7,9 @@ S/M/L mapped to a number of weeks per phase), and the tool generates a Gantt-sty
 It runs entirely on your own laptop. Your data is stored in a local file on your machine and is
 never uploaded anywhere.
 
+This README covers installing and running the app. For how to actually use it once it's running —
+building a roadmap, sizing work, and reading the timeline — see the **[User Guide](./USER_GUIDE.md)**.
+
 ## What you can do with it
 
 - Organize a program into projects, milestones, increments, and initiatives
@@ -131,6 +134,10 @@ project called **Sample Program**.
 
 That's it — you're running the tool.
 
+**Next step:** the [User Guide](./USER_GUIDE.md) walks through building your first roadmap. Start with
+[Your first 15 minutes](./USER_GUIDE.md#your-first-15-minutes), and explore the `Sample Program`
+project as you read — it's placeholder data, so you can't break anything.
+
 ## Using it day to day
 
 **To stop the app:** click on the Terminal window and press `Ctrl + C`. Closing the browser tab does
@@ -165,7 +172,9 @@ Your projects are saved in a single file on your laptop at
 You can back up the project directory, including the database file, with Google Drive Sync if you choose.
 
 The sample data is placeholder content, so feel free to delete the `Sample Program` project once
-you have created your own.
+you have created your own. Note that deleting a project cannot be undone — see
+[Things that surprise people](./USER_GUIDE.md#things-that-surprise-people) in the User Guide for the
+other places the app doesn't ask twice.
 
 To wipe everything and start over with fresh sample data:
 
@@ -227,9 +236,17 @@ GitHub account. If it still fails, confirm you have access to the NavaPBC organi
 **Still stuck?** Copy the last 20 lines of red or error text from Terminal and send them to the repo
 owner. The exact error text is the useful part.
 
+The problems above are all about getting the app running. If the app is running but not behaving how
+you expect — a greyed-out sizing key, missing timeline rulers, a schedule that got shorter — see
+[Common questions](./USER_GUIDE.md#common-questions) in the User Guide instead.
+
 ---
 
 # For developers
+
+The [User Guide](./USER_GUIDE.md) documents the domain model and product behavior from a user's
+perspective — the final-size calculation, the sizing-key compatibility rule, sequential scheduling,
+and calendar-accurate month durations. It's the quickest way to get oriented before reading the code.
 
 ## Architecture
 
