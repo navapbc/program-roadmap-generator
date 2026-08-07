@@ -10,6 +10,7 @@ export default function TimelinePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const utils = trpc.useUtils();
   const project = trpc.project.getById.useQuery({ id: projectId! }, { enabled: !!projectId });
+  const markerList = trpc.marker.listForProject.useQuery({ projectId: projectId! }, { enabled: !!projectId });
   const updateProject = trpc.project.update.useMutation({ onSuccess: () => utils.project.getById.invalidate() });
 
   const [sizingKeyId, setSizingKeyId] = useState<string | null>(null);
@@ -77,6 +78,22 @@ export default function TimelinePage() {
     updateProject.mutate({ id: data.id, timelineHeaderScales: next });
   }
 
+  const sprintCadence =
+    data.sprintLengthBusinessDays != null && data.sprintStartWeekday != null
+      ? { lengthBusinessDays: data.sprintLengthBusinessDays, startWeekday: data.sprintStartWeekday }
+      : null;
+
+  // Markers are real absolute dates — with no start date there's no origin
+  // to place them against, so they're simply not shown (rather than guessed).
+  const markers =
+    startDate && markerList.data
+      ? markerList.data.map((m) => ({
+          id: m.id,
+          label: m.label,
+          offsetWeeks: (new Date(m.date).getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7),
+        }))
+      : [];
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -106,7 +123,12 @@ export default function TimelinePage() {
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">Header scales</label>
-          <ScaleToggleList selected={headerScales} hasStartDate={!!startDate} onToggle={toggleScale} />
+          <ScaleToggleList
+            selected={headerScales}
+            hasStartDate={!!startDate}
+            hasSprintCadence={!!sprintCadence}
+            onToggle={toggleScale}
+          />
         </div>
       </div>
 
@@ -118,6 +140,8 @@ export default function TimelinePage() {
           milestoneBoundaries={timeline.milestoneBoundaries}
           scales={headerScales}
           startDate={startDate}
+          sprintCadence={sprintCadence}
+          markers={markers}
         />
       )}
     </div>

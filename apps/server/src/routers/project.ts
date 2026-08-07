@@ -47,7 +47,22 @@ export const projectRouter = router({
   }),
 
   update: publicProcedure.input(updateProjectSchema).mutation(async ({ ctx, input }) => {
-    const { id, timelineHeaderScales, defaultSizingKeyId, ...rest } = input;
+    const { id, timelineHeaderScales, defaultSizingKeyId, sprintLengthBusinessDays, sprintStartWeekday, ...rest } = input;
+
+    if (sprintLengthBusinessDays !== undefined || sprintStartWeekday !== undefined) {
+      const current = await ctx.prisma.project.findUniqueOrThrow({
+        where: { id },
+        select: { sprintLengthBusinessDays: true, sprintStartWeekday: true },
+      });
+      const mergedLength = sprintLengthBusinessDays !== undefined ? sprintLengthBusinessDays : current.sprintLengthBusinessDays;
+      const mergedWeekday = sprintStartWeekday !== undefined ? sprintStartWeekday : current.sprintStartWeekday;
+      if ((mergedLength == null) !== (mergedWeekday == null)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Set both a sprint length and a start weekday, or clear both.',
+        });
+      }
+    }
 
     if (defaultSizingKeyId) {
       const [projectLabels, key] = await Promise.all([
@@ -73,6 +88,8 @@ export const projectRouter = router({
         ...rest,
         ...(defaultSizingKeyId !== undefined ? { defaultSizingKeyId } : {}),
         ...(timelineHeaderScales ? { timelineHeaderScales: JSON.stringify(timelineHeaderScales) } : {}),
+        ...(sprintLengthBusinessDays !== undefined ? { sprintLengthBusinessDays } : {}),
+        ...(sprintStartWeekday !== undefined ? { sprintStartWeekday } : {}),
       },
     });
     return toProjectDTO(project);

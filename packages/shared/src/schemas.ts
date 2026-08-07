@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 export const idSchema = z.string().cuid();
 export const phaseUnitSchema = z.enum(['day', 'week', 'month']);
-export const scaleUnitSchema = z.enum(['day', 'week', 'month', 'quarter', 'year']);
+export const scaleUnitSchema = z.enum(['day', 'week', 'month', 'sprint', 'quarter', 'year']);
+/** 0=Sunday..6=Saturday, matching Date#getUTCDay(). */
+export const weekdaySchema = z.number().int().min(0).max(6);
 
 export const createProjectSchema = z.object({
   name: z.string().min(1),
@@ -16,6 +18,8 @@ export const updateProjectSchema = z.object({
   startDate: z.coerce.date().nullable().optional(),
   defaultSizingKeyId: idSchema.nullable().optional(),
   timelineHeaderScales: z.array(scaleUnitSchema).optional(),
+  sprintLengthBusinessDays: z.number().int().positive().nullable().optional(),
+  sprintStartWeekday: weekdaySchema.nullable().optional(),
 });
 
 export const reorderSchema = z.object({
@@ -145,4 +149,16 @@ export const computeTimelineInputSchema = z.object({
   sizingKeyId: idSchema,
   milestoneId: idSchema.optional(),
   startDateOverride: z.coerce.date().nullable().optional(),
+});
+
+export const createTimelineMarkerSchema = z.object({
+  projectId: idSchema,
+  label: z.string().min(1),
+  date: z.coerce.date(),
+});
+
+export const updateTimelineMarkerSchema = z.object({
+  id: idSchema,
+  label: z.string().min(1).optional(),
+  date: z.coerce.date().optional(),
 });

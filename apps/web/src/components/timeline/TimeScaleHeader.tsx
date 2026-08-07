@@ -1,13 +1,17 @@
-import { computeScaleTicks, SCALE_DISPLAY_ORDER, type ScaleUnit } from '@roadmap/shared';
+import { computeScaleTicks, SCALE_DISPLAY_ORDER, type ScaleUnit, type SprintCadence } from '@roadmap/shared';
 
 export default function TimeScaleHeader({
   scales,
   startDate,
   totalDurationWeeks,
+  pixelsPerWeek,
+  sprintCadence,
 }: {
   scales: ScaleUnit[];
   startDate: Date | null;
   totalDurationWeeks: number;
+  pixelsPerWeek: number;
+  sprintCadence?: SprintCadence | null;
 }) {
   if (totalDurationWeeks <= 0) return null;
 
@@ -18,7 +22,7 @@ export default function TimeScaleHeader({
   return (
     <div className="border-b border-slate-200">
       {orderedScales.map((scale) => {
-        const ticks = computeScaleTicks(scale, { startDate, totalDurationWeeks });
+        const ticks = computeScaleTicks(scale, { startDate, totalDurationWeeks, sprintCadence });
         if (ticks.length === 0) return null;
         return (
           <div key={scale} className="relative h-6 border-t border-slate-100 first:border-t-0">
@@ -27,8 +31,8 @@ export default function TimeScaleHeader({
                 key={i}
                 className="absolute inset-y-0 border-r border-slate-200 text-[10px] text-slate-500 px-1 truncate flex items-center"
                 style={{
-                  left: `${(tick.startOffsetWeeks / totalDurationWeeks) * 100}%`,
-                  width: `${(tick.widthWeeks / totalDurationWeeks) * 100}%`,
+                  left: `${tick.startOffsetWeeks * pixelsPerWeek}px`,
+                  width: `${tick.widthWeeks * pixelsPerWeek}px`,
                 }}
                 title={tick.label}
               >

@@ -28,6 +28,7 @@ export default function CombinedTimelinePage() {
   // without breaking the rules of hooks.
   const projectResults = trpc.useQueries((t) => completeScopes.map((s) => t.project.getById({ id: s.projectId })));
   const keyResults = trpc.useQueries((t) => completeScopes.map((s) => t.sizingKey.getFull({ id: s.sizingKeyId })));
+  const markerResults = trpc.useQueries((t) => completeScopes.map((s) => t.marker.listForProject({ projectId: s.projectId })));
 
   function addScope() {
     setScopes((prev) => [...prev, { localId: `scope-${nextId.current++}`, projectId: '', sizingKeyId: '', milestoneId: '' }]);
@@ -40,6 +41,9 @@ export default function CombinedTimelinePage() {
   }
 
   const hasStartDate = completeScopes.some((_, i) => !!projectResults[i]?.data?.startDate);
+  const hasSprintCadence = completeScopes.some(
+    (_, i) => !!projectResults[i]?.data?.startDate && projectResults[i]?.data?.sprintLengthBusinessDays != null
+  );
 
   const groups: CombinedScopeGroup[] = useMemo(() => {
     const result: CombinedScopeGroup[] = [];
@@ -69,18 +73,32 @@ export default function CombinedTimelinePage() {
 
       const computed = computeTimeline({ sequence, phases, durations, startDate });
       const milestoneLabel = scope.milestoneId ? milestones[0]?.name : null;
+      const sprintCadence =
+        project.sprintLengthBusinessDays != null && project.sprintStartWeekday != null
+          ? { lengthBusinessDays: project.sprintLengthBusinessDays, startWeekday: project.sprintStartWeekday }
+          : null;
+
+      const markers = startDate
+        ? (markerResults[i]?.data ?? []).map((m) => ({
+            id: m.id,
+            label: m.label,
+            offsetWeeks: (new Date(m.date).getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 7),
+          }))
+        : [];
 
       result.push({
         scopeId: scope.localId,
         label: milestoneLabel ? `${project.name} — ${milestoneLabel}` : project.name,
         startDate,
+        sprintCadence,
         totalDurationWeeks: computed.totalDurationWeeks,
         rows: computed.rows,
+        markers,
       });
     });
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completeScopes, projectResults, keyResults]);
+  }, [completeScopes, projectResults, keyResults, markerResults]);
 
   function toggleScale(scale: ScaleUnit) {
     setScales((prev) => (prev.includes(scale) ? prev.filter((s) => s !== scale) : [...prev, scale]));
@@ -113,7 +131,7 @@ export default function CombinedTimelinePage() {
       {scopes.length > 0 && (
         <div className="mb-4">
           <label className="block text-xs font-medium text-slate-500 mb-1">Header scales</label>
-          <ScaleToggleList selected={scales} hasStartDate={hasStartDate} onToggle={toggleScale} />
+          <ScaleToggleList selected={scales} hasStartDate={hasStartDate} hasSprintCadence={hasSprintCadence} onToggle={toggleScale} />
         </div>
       )}
 

@@ -8,18 +8,39 @@ datasource db {
 }
 
 model Project {
-  id                   String   @id @default(cuid())
-  name                 String
-  description          String?
-  startDate            DateTime?
-  defaultSizingKeyId   String?
-  timelineHeaderScales String   @default("[\"month\",\"week\"]")
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                       String    @id @default(cuid())
+  name                     String
+  description              String?
+  startDate                DateTime?
+  defaultSizingKeyId       String?
+  timelineHeaderScales     String    @default("[\"month\",\"week\"]")
+  // Both set or both null — enforced in project.update, not here (SQLite
+  // CHECK constraints can't express "both or neither" as cleanly as a
+  // simple predicate on their own, and it's already validated via Zod).
+  // 0=Sunday..6=Saturday, matching Date#getUTCDay().
+  sprintLengthBusinessDays Int?
+  sprintStartWeekday       Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  defaultSizingKey SizingKey?  @relation(fields: [defaultSizingKeyId], references: [id], onDelete: SetNull)
+  defaultSizingKey SizingKey?      @relation(fields: [defaultSizingKeyId], references: [id], onDelete: SetNull)
   sizeLabels       SizeLabel[]
   milestones       Milestone[]
+  markers          TimelineMarker[]
+}
+
+/// A single named point in time (e.g. "Target launch") shown as a vertical line on the Timeline.
+model TimelineMarker {
+  id        String   @id @default(cuid())
+  projectId String
+  label     String
+  date      DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model SizeLabel {

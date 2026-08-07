@@ -3,6 +3,7 @@ import { trpc } from '../trpc.js';
 import SizingKeyLabelEditor from '../components/sizing/SizingKeyLabelEditor.js';
 import PhaseEditor from '../components/sizing/PhaseEditor.js';
 import DurationGrid from '../components/sizing/DurationGrid.js';
+import SizingKeyTimelinePreview from '../components/sizing/SizingKeyTimelinePreview.js';
 
 export default function SizingKeyEditorPage() {
   const { sizingKeyId } = useParams<{ sizingKeyId: string }>();
@@ -56,6 +57,15 @@ export default function SizingKeyEditorPage() {
         <h2 className="text-sm font-semibold text-slate-700 mb-2">Durations</h2>
         <p className="text-xs text-slate-400 mb-2">How long each phase takes for each size, in that phase's unit.</p>
         <DurationGrid sizingKeyId={data.id} labels={data.labels} phases={data.phases} />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-slate-700 mb-2">Timeline preview</h2>
+        <p className="text-xs text-slate-400 mb-2">
+          One row per size, split into phase segments — the same shape as the source spreadsheet's size-key tab.
+          Always relative (no project or start date at this level).
+        </p>
+        <SizingKeyTimelinePreview labels={data.labels} phases={data.phases} />
       </div>
     </div>
   );
