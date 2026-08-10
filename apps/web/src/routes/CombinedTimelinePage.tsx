@@ -1,16 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
-import {
-  computeFinalSize,
-  computeTimeline,
-  isDayScaleReadable,
-  type PhaseUnit,
-  type ScaleUnit,
-  type TimelineInitiativeInput,
-} from '@roadmap/shared';
+import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizingKeySelector from '../components/timeline/SizingKeySelector.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
-import CombinedTimelineView, { type CombinedScopeGroup } from '../components/timeline/CombinedTimelineView.js';
+import CombinedTimelineView, {
+  computeSharedTotalWeeks,
+  LABEL_COL_WIDTH,
+  type CombinedScopeGroup,
+} from '../components/timeline/CombinedTimelineView.js';
 import { useZoom } from '../hooks/useZoom.js';
 
 interface Scope {
@@ -26,7 +23,6 @@ export default function CombinedTimelinePage() {
   const nextId = useRef(0);
   const [scopes, setScopes] = useState<Scope[]>([]);
   const [scales, setScales] = useState<ScaleUnit[]>(DEFAULT_SCALES);
-  const zoom = useZoom();
 
   const projects = trpc.project.list.useQuery();
 
@@ -109,6 +105,8 @@ export default function CombinedTimelinePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [completeScopes, projectResults, keyResults, markerResults]);
 
+  const zoom = useZoom(groups.length > 0 ? computeSharedTotalWeeks(groups) : 1, LABEL_COL_WIDTH);
+
   function toggleScale(scale: ScaleUnit) {
     setScales((prev) => (prev.includes(scale) ? prev.filter((s) => s !== scale) : [...prev, scale]));
   }
@@ -144,7 +142,7 @@ export default function CombinedTimelinePage() {
             selected={scales}
             hasStartDate={hasStartDate}
             hasSprintCadence={hasSprintCadence}
-            dayReadable={isDayScaleReadable(zoom.pixelsPerWeek)}
+            pixelsPerWeek={zoom.pixelsPerWeek}
             onToggle={toggleScale}
           />
         </div>

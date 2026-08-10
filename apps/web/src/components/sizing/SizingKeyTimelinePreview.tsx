@@ -4,7 +4,7 @@ import ZoomControl from '../timeline/ZoomControl.js';
 import { useZoom } from '../../hooks/useZoom.js';
 
 const PHASE_COLORS = ['bg-indigo-400', 'bg-emerald-400', 'bg-amber-400', 'bg-rose-400', 'bg-cyan-400', 'bg-violet-400'];
-const LABEL_COL_WIDTH = 96; // px — just the size code, narrower than the Timeline's initiative-name column
+export const LABEL_COL_WIDTH = 96; // px — just the size code, narrower than the Timeline's initiative-name column
 
 interface Label {
   id: string;
@@ -29,17 +29,11 @@ interface Phase {
  * row starts at week 0 independently instead of chaining sequentially.
  */
 export default function SizingKeyTimelinePreview({ labels, phases }: { labels: Label[]; phases: Phase[] }) {
-  const zoom = useZoom();
-
   const sortedLabels = [...labels].sort((a, b) => a.orderIndex - b.orderIndex);
   const sortedPhases = [...phases]
     .sort((a, b) => a.orderIndex - b.orderIndex)
     .map((p) => ({ id: p.id, name: p.name, unit: p.unit as PhaseUnit, orderIndex: p.orderIndex }));
   const durations = phases.flatMap((p) => p.durations.map((d) => ({ sizingPhaseId: p.id, labelCode: d.labelCode, durationValue: d.durationValue })));
-
-  if (sortedLabels.length === 0 || sortedPhases.length === 0) {
-    return <p className="text-sm text-slate-400">Add at least one size label and one phase to preview the timeline.</p>;
-  }
 
   const rows: TimelineRow[] = sortedLabels.map((label) => {
     const result = computeTimeline({
@@ -51,10 +45,15 @@ export default function SizingKeyTimelinePreview({ labels, phases }: { labels: L
     return result.rows[0];
   });
 
+  const total = Math.max(1, ...rows.map((r) => r.totalDurationWeeks));
+  const zoom = useZoom(total, LABEL_COL_WIDTH);
+
+  if (sortedLabels.length === 0 || sortedPhases.length === 0) {
+    return <p className="text-sm text-slate-400">Add at least one size label and one phase to preview the timeline.</p>;
+  }
+
   const phaseNames = [...new Set(rows.flatMap((r) => r.segments.map((s) => s.phaseName)))];
   const colorByPhase = new Map(phaseNames.map((name, i) => [name, PHASE_COLORS[i % PHASE_COLORS.length]]));
-
-  const total = Math.max(1, ...rows.map((r) => r.totalDurationWeeks));
   const chartWidth = total * zoom.pixelsPerWeek;
 
   return (
@@ -69,7 +68,7 @@ export default function SizingKeyTimelinePreview({ labels, phases }: { labels: L
         />
       </div>
 
-      <div className="border border-slate-200 rounded-md overflow-x-auto bg-white">
+      <div ref={zoom.containerRef} className="border border-slate-200 rounded-md overflow-x-auto bg-white">
         <div style={{ width: LABEL_COL_WIDTH + chartWidth, minWidth: '100%' }}>
           <div className="flex">
             <div className="sticky left-0 z-20 flex-shrink-0 border-r border-slate-200 bg-slate-50" style={{ width: LABEL_COL_WIDTH }} />

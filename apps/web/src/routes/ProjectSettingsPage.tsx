@@ -80,7 +80,7 @@ export default function ProjectSettingsPage() {
   const hasCompatibleKey = keys.data?.some((k) => k.compatible) ?? true; // assume yes until loaded, to avoid a flash
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-2xl mx-auto space-y-8">
       <div>
         <Link to={`/projects/${data.id}`} className="text-sm text-slate-500 hover:text-slate-900">
           ← Back to {data.name}
