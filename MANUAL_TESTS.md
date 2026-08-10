@@ -108,7 +108,8 @@ passed once.
 ## Timeline view
 
 - [ ] Select a compatible Sizing Key; the Gantt renders with one row per Initiative, grouped under
-      Milestone dividers, sequential and non-overlapping.
+      Milestone dividers with a nested Increment divider beneath each Milestone (Milestone → Increment
+      → Initiative), sequential and non-overlapping.
 - [ ] Switch to a different compatible Sizing Key and confirm the chart updates **instantly with no
       network request** (check the browser's Network tab — after the first load of each key,
       switching back and forth should show zero new `sizingKey.getFull` calls).
@@ -126,6 +127,21 @@ passed once.
       confirm it wraps in full within the label column (row grows taller to fit) rather than being
       cut off with an ellipsis, and its phase bar stays vertically centered in the taller row. Check
       this on both the Timeline page and Combined Timeline.
+
+## Date range window (Timeline & Combined Timeline)
+
+- [ ] With a project Start date set, open its Timeline and set both a range Start and End date
+      (e.g. just the current calendar year); confirm the chart narrows to show only that span.
+- [ ] Confirm an Initiative/segment that starts before the range Start, or extends past the range
+      End, renders greyed out with the italic note "Work starts before the currently selected time
+      span.", "Work extends beyond the currently selected time span.", or the combined "before and
+      beyond" wording — and stays in the row list (not hidden), just visually de-emphasized.
+- [ ] Use **Clear** to remove the range; confirm the chart returns to showing the full, unclipped
+      timeline.
+- [ ] Confirm the date-range inputs only appear once a Start date exists (there's no calendar to
+      window against otherwise).
+- [ ] Repeat the same range-set / greyed-note / Clear checks on the **Combined Timeline** page,
+      where the range applies across the shared axis for every scope at once.
 
 ## Zoom & readability
 
@@ -185,13 +201,56 @@ passed once.
 
 ## Combined Timeline
 
-- [ ] Add two or more scopes (different Projects, and/or a specific Milestone within a Project),
-      each with its own Sizing Key selection.
-- [ ] Confirm each scope renders as its own labeled group, all sharing one time axis.
+- [ ] Add two or more scopes; confirm the selector fields appear in the order **Project → Milestone
+      → Increment → Sizing Key**, each cascading (Milestone options are scoped to the chosen
+      Project; Increment options are scoped to the chosen Milestone).
+- [ ] For a scope's Milestone field, confirm the options are "Whole project" plus one entry per
+      Milestone — choosing a specific Milestone narrows the Increment field's options to that
+      Milestone's Increments; choosing "Whole project" clears any Increment selection.
+- [ ] For a scope's Increment field, confirm the options are "Whole milestone" plus one entry per
+      Increment in the selected Milestone — choosing a specific Increment scopes that group's
+      timeline rows down to just that Increment's Initiatives; "Whole milestone" shows every
+      Increment under that Milestone.
+- [ ] Confirm each scope renders as its own labeled group (labeled with Project — Milestone —
+      Increment as applicable), grouped internally under Milestone → Increment dividers exactly
+      like the single-project Timeline, all sharing one time axis.
 - [ ] Confirm a scope with no Start date is visibly flagged "relative" rather than silently
       misaligned against an anchored scope.
 - [ ] Confirm markers and sprint cadence (when present on the relevant scope's project) render
       correctly offset within the shared axis.
+
+### Forced start-date override for relative scopes
+
+- [ ] Add one scope on a Project **with** a Start date and a second scope on a Project **without**
+      one; confirm the unanchored scope's row shows a required "Start date" field (labeled as
+      being for this view only, not saved to the Project) and the scope cannot be meaningfully
+      positioned on the shared axis until it's filled in.
+- [ ] Fill in that override date; confirm the unanchored scope's bars now align on the shared axis
+      at that date, still tagged "relative".
+- [ ] Reload the page (or remove and re-add the anchored scope so only the unanchored one remains):
+      confirm the override field disappears once there's no other anchored scope to align against.
+- [ ] After setting an override and saving the view (see below), reload the source Project directly
+      — confirm its own Start date is still unset; the override never wrote back to the Project.
+
+### Saved Combined Views
+
+- [ ] With two or more scopes configured (including any date range / header scale choices), enter a
+      name and click **Save**; confirm the view appears in the "Saved view" dropdown and the page
+      switches into "editing an existing view" mode (Update / Save as new / Delete buttons appear).
+- [ ] Change something (add a scope, change a Sizing Key) and click **Update**; reload the page,
+      re-select the same saved view from the dropdown, and confirm the change persisted.
+- [ ] Make another change and click **Save as new** with a different name; confirm it creates a
+      second, independent saved view (the original is untouched) and both appear in the dropdown.
+- [ ] Select a saved view from the dropdown; confirm every scope's Project/Milestone/Increment/
+      Sizing Key selections, the date range, and header-scale choices all restore exactly as saved —
+      including that **every scope's Sizing Key dropdown is populated with options**, not just
+      showing the placeholder (this regressed once already: loading a view with several scopes at
+      once could silently 404 some of the batched data requests server-side; if a dropdown comes up
+      empty after Load, that's this bug back).
+- [ ] Click **Delete** on a saved view; confirm it disappears from the dropdown and the page falls
+      back to a new unsaved view.
+- [ ] Select "New (unsaved) view" from the dropdown; confirm it clears back to an empty scope list
+      without needing a page reload.
 
 ## Import
 

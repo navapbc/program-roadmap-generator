@@ -23,10 +23,11 @@ model Project {
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
-  defaultSizingKey SizingKey?      @relation(fields: [defaultSizingKeyId], references: [id], onDelete: SetNull)
-  sizeLabels       SizeLabel[]
-  milestones       Milestone[]
-  markers          TimelineMarker[]
+  defaultSizingKey   SizingKey?          @relation(fields: [defaultSizingKeyId], references: [id], onDelete: SetNull)
+  sizeLabels         SizeLabel[]
+  milestones         Milestone[]
+  markers            TimelineMarker[]
+  combinedViewScopes CombinedViewScope[]
 }
 
 /// A single named point in time (e.g. "Target launch") shown as a vertical line on the Timeline.
@@ -66,8 +67,9 @@ model Milestone {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  increments Increment[]
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  increments         Increment[]
+  combinedViewScopes CombinedViewScope[]
 
   @@index([projectId])
 }
@@ -81,26 +83,27 @@ model Increment {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  milestone   Milestone    @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
-  initiatives Initiative[]
+  milestone          Milestone           @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  initiatives        Initiative[]
+  combinedViewScopes CombinedViewScope[]
 
   @@index([milestoneId])
 }
 
 model Initiative {
-  id                         String    @id @default(cuid())
-  incrementId                String
-  name                       String
-  orderKey                   String
-  policySizeLabelId          String?
-  implementationSizeLabelId  String?
-  timeEstimateWeeks          Float?
-  notes                      String?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
+  id                        String   @id @default(cuid())
+  incrementId               String
+  name                      String
+  orderKey                  String
+  policySizeLabelId         String?
+  implementationSizeLabelId String?
+  timeEstimateWeeks         Float?
+  notes                     String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
-  increment              Increment  @relation(fields: [incrementId], references: [id], onDelete: Cascade)
-  policySizeLabel        SizeLabel? @relation("InitiativePolicySize", fields: [policySizeLabelId], references: [id], onDelete: SetNull)
+  increment               Increment  @relation(fields: [incrementId], references: [id], onDelete: Cascade)
+  policySizeLabel         SizeLabel? @relation("InitiativePolicySize", fields: [policySizeLabelId], references: [id], onDelete: SetNull)
   implementationSizeLabel SizeLabel? @relation("InitiativeImplementationSize", fields: [implementationSizeLabelId], references: [id], onDelete: SetNull)
 
   @@index([incrementId])
@@ -113,9 +116,10 @@ model SizingKey {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  labels   SizingKeyLabel[]
-  phases   SizingPhase[]
-  projects Project[]
+  labels             SizingKeyLabel[]
+  phases             SizingPhase[]
+  projects           Project[]
+  combinedViewScopes CombinedViewScope[]
 }
 
 model SizingKeyLabel {
@@ -147,12 +151,54 @@ model SizingPhase {
 }
 
 model SizingDuration {
-  id             String @id @default(cuid())
-  sizingPhaseId  String
-  labelCode      String
-  durationValue  Float
+  id            String @id @default(cuid())
+  sizingPhaseId String
+  labelCode     String
+  durationValue Float
 
   sizingPhase SizingPhase @relation(fields: [sizingPhaseId], references: [id], onDelete: Cascade)
 
   @@unique([sizingPhaseId, labelCode])
+}
+
+/// A saved Combined Timeline configuration — a named set of scopes (one row
+/// per project/milestone/increment/sizing-key selection) plus the header
+/// scales and optional date-range window the user had configured, so the
+/// whole comparison can be reopened later instead of rebuilt from scratch.
+model CombinedView {
+  id                   String    @id @default(cuid())
+  name                 String
+  timelineHeaderScales String    @default("[\"month\",\"week\"]")
+  dateRangeStart       DateTime?
+  dateRangeEnd         DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  scopes CombinedViewScope[]
+}
+
+/// One row/scope within a saved Combined View. milestoneId/incrementId null
+/// means "whole project" / "whole milestone" respectively — incrementId is
+/// only meaningful once milestoneId narrows to a specific milestone.
+/// startDateOverride is a view-only "modeling" start date used when this
+/// scope's own project has no real start date but needs to be plotted
+/// alongside an anchored one — it's never written back to the Project.
+model CombinedViewScope {
+  id                String    @id @default(cuid())
+  combinedViewId    String
+  projectId         String
+  milestoneId       String?
+  incrementId       String?
+  sizingKeyId       String
+  startDateOverride DateTime?
+  orderKey          String
+
+  combinedView CombinedView @relation(fields: [combinedViewId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone    Milestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  increment    Increment?   @relation(fields: [incrementId], references: [id], onDelete: SetNull)
+  sizingKey    SizingKey    @relation(fields: [sizingKeyId], references: [id], onDelete: Cascade)
+
+  @@index([combinedViewId])
+  @@index([projectId])
 }
