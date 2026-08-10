@@ -185,3 +185,39 @@ export const updateTimelineMarkerSchema = z.object({
   label: z.string().min(1).optional(),
   date: z.coerce.date().optional(),
 });
+
+/**
+ * One row of a saved Combined View. milestoneId/incrementId null means
+ * "whole project" / "whole milestone" respectively — incrementId is only
+ * meaningful once milestoneId narrows to one specific milestone.
+ * startDateOverride is a view-only "modeling" date, never written to the
+ * Project — it exists purely so an unanchored project can be plotted
+ * alongside an anchored one within this saved view.
+ */
+export const combinedViewScopeInputSchema = z.object({
+  projectId: idSchema,
+  milestoneId: idSchema.nullable(),
+  incrementId: idSchema.nullable(),
+  sizingKeyId: idSchema,
+  startDateOverride: z.coerce.date().nullable().optional(),
+});
+
+export const createCombinedViewSchema = z.object({
+  name: z.string().min(1),
+  timelineHeaderScales: z.array(scaleUnitSchema).optional(),
+  dateRangeStart: z.coerce.date().nullable().optional(),
+  dateRangeEnd: z.coerce.date().nullable().optional(),
+  scopes: z.array(combinedViewScopeInputSchema),
+});
+
+// scopes, when present, wholesale-replaces the saved set — a Combined View's
+// scopes aren't edited piecemeal from the UI, they're re-saved as a whole
+// each time, so there's no per-scope id to diff against on update.
+export const updateCombinedViewSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1).optional(),
+  timelineHeaderScales: z.array(scaleUnitSchema).optional(),
+  dateRangeStart: z.coerce.date().nullable().optional(),
+  dateRangeEnd: z.coerce.date().nullable().optional(),
+  scopes: z.array(combinedViewScopeInputSchema).optional(),
+});

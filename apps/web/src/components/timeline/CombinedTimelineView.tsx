@@ -1,4 +1,4 @@
-import type { ScaleUnit, SprintCadence } from '@roadmap/shared';
+import { checkRowAgainstWindow, type DateRangeWindow, type MilestoneBoundary, type ScaleUnit, type SprintCadence } from '@roadmap/shared';
 import TimeScaleHeader from './TimeScaleHeader.js';
 import ZoomControl from './ZoomControl.js';
 import { MarkerLabelsRow, MarkerLines, type MarkerTick } from './TimelineMarkers.js';
@@ -37,7 +37,15 @@ export interface CombinedScopeGroup {
   sprintCadence?: SprintCadence | null;
   totalDurationWeeks: number;
   rows: RowDTO[];
+  milestoneBoundaries: MilestoneBoundary[];
   markers?: MarkerDTO[];
+}
+
+function rangeNote(status: { extendsBefore: boolean; extendsBeyond: boolean }): string | null {
+  if (status.extendsBefore && status.extendsBeyond) return 'Work extends before and beyond the currently selected time span.';
+  if (status.extendsBefore) return 'Work starts before the currently selected time span.';
+  if (status.extendsBeyond) return 'Work extends beyond the currently selected time span.';
+  return null;
 }
 
 /**
@@ -68,10 +76,13 @@ export default function CombinedTimelineView({
   groups,
   scales,
   zoom,
+  dateWindow,
 }: {
   groups: CombinedScopeGroup[];
   scales: ScaleUnit[];
   zoom: ReturnType<typeof useZoom>;
+  /** Restricts the visible chart to a date window (in shared-origin week-offsets) — out-of-window rows stay in the list but render greyed with an explanatory note. */
+  dateWindow?: DateRangeWindow;
 }) {
   if (groups.length === 0) return null;
 
@@ -82,8 +93,14 @@ export default function CombinedTimelineView({
       sharedOrigin && g.startDate ? weeksBetween(sharedOrigin, g.startDate) : 0,
     ])
   );
-  const sharedTotalWeeks = computeSharedTotalWeeks(groups);
+  const fullSharedTotalWeeks = computeSharedTotalWeeks(groups);
+
+  const windowStart = dateWindow?.startOffsetWeeks ?? 0;
+  const windowEnd = dateWindow?.endOffsetWeeks ?? fullSharedTotalWeeks;
+  const sharedTotalWeeks = Math.max(0.01, windowEnd - windowStart);
   const chartWidth = sharedTotalWeeks * zoom.pixelsPerWeek;
+  const windowStartDate =
+    sharedOrigin && windowStart !== 0 ? new Date(sharedOrigin.getTime() + windowStart * 7 * 24 * 60 * 60 * 1000) : sharedOrigin;
 
   const phaseNames = [...new Set(groups.flatMap((g) => g.rows.flatMap((r) => r.segments.map((s) => s.phaseName))))];
   const colorByPhase = new Map(phaseNames.map((name, i) => [name, PHASE_COLORS[i % PHASE_COLORS.length]]));
@@ -95,7 +112,7 @@ export default function CombinedTimelineView({
 
   const markers: MarkerTick[] = groups.flatMap((g) => {
     const offset = offsetByScope.get(g.scopeId) ?? 0;
-    return (g.markers ?? []).map((m) => ({ id: m.id, label: `${m.label} (${g.label})`, offsetWeeks: offset + m.offsetWeeks }));
+    return (g.markers ?? []).map((m) => ({ id: m.id, label: `${m.label} (${g.label})`, offsetWeeks: offset + m.offsetWeeks - windowStart }));
   });
 
   return (
@@ -124,7 +141,7 @@ export default function CombinedTimelineView({
               <MarkerLabelsRow markers={markers} pixelsPerWeek={zoom.pixelsPerWeek} />
               <TimeScaleHeader
                 scales={scales}
-                startDate={sharedOrigin}
+                startDate={windowStartDate}
                 totalDurationWeeks={sharedTotalWeeks}
                 pixelsPerWeek={zoom.pixelsPerWeek}
                 sprintCadence={sprintCadence}
@@ -135,6 +152,7 @@ export default function CombinedTimelineView({
           {groups.map((group) => {
             const offset = offsetByScope.get(group.scopeId) ?? 0;
             const isUnanchored = sharedOrigin != null && group.startDate == null;
+            const rowsByInitiativeId = new Map(group.rows.map((r) => [r.initiativeId, r]));
             return (
               <div key={group.scopeId}>
                 <div className="flex bg-slate-100 border-t border-b border-slate-200">
@@ -154,35 +172,81 @@ export default function CombinedTimelineView({
                   </div>
                   <div style={{ width: chartWidth }} />
                 </div>
-                {group.rows.map((row) => (
-                  <div key={row.initiativeId} className="flex border-t border-slate-100">
-                    <div
-                      className="sticky left-0 z-20 flex-shrink-0 px-3 py-2 text-sm text-slate-800 flex items-start gap-1 bg-white"
-                      style={{ width: LABEL_COL_WIDTH }}
-                    >
-                      <span className="min-w-0 break-words">{row.name}</span>
-                      {row.warning === 'missing-size' && (
-                        <span className="shrink-0 text-[10px] text-amber-600 bg-amber-50 px-1 rounded">unsized</span>
-                      )}
-                      {row.warning === 'missing-duration' && (
-                        <span className="shrink-0 text-[10px] text-red-600 bg-red-50 px-1 rounded">missing data</span>
-                      )}
-                    </div>
-                    <div className="relative h-8 self-center" style={{ width: chartWidth }}>
-                      {row.segments.map((seg, i) => (
+
+                {group.milestoneBoundaries.map((milestone) => {
+                  const milestoneInitiativeIds = milestone.increments.flatMap((inc) => inc.initiativeIds);
+                  const milestoneRows = milestoneInitiativeIds.map((id) => rowsByInitiativeId.get(id)).filter(Boolean);
+                  if (milestoneRows.length === 0) return null;
+                  return (
+                    <div key={milestone.milestoneId}>
+                      <div className="flex bg-slate-50 border-t border-slate-100">
                         <div
-                          key={i}
-                          className={`absolute inset-y-1.5 rounded-sm ${colorByPhase.get(seg.phaseName) ?? 'bg-slate-400'}`}
-                          style={{
-                            left: `${(offset + seg.startOffsetWeeks) * zoom.pixelsPerWeek}px`,
-                            width: `${Math.max(seg.durationWeeks * zoom.pixelsPerWeek, 2)}px`,
-                          }}
-                          title={`${seg.phaseName}: ${seg.displayDuration} ${seg.unitName}${seg.displayDuration === 1 ? '' : 's'}`}
-                        />
-                      ))}
+                          className="sticky left-0 z-20 flex-shrink-0 px-3 py-1 text-xs font-medium text-slate-600 bg-slate-50"
+                          style={{ width: LABEL_COL_WIDTH }}
+                        >
+                          {milestone.name}
+                        </div>
+                        <div style={{ width: chartWidth }} />
+                      </div>
+
+                      {milestone.increments.map((increment) => {
+                        const rows = increment.initiativeIds.map((id) => rowsByInitiativeId.get(id)).filter((r): r is NonNullable<typeof r> => !!r);
+                        if (rows.length === 0) return null;
+                        return (
+                          <div key={increment.incrementId}>
+                            <div className="flex border-t border-slate-100">
+                              <div
+                                className="sticky left-0 z-20 flex-shrink-0 pl-6 pr-3 py-1 text-xs font-medium text-slate-400 bg-white"
+                                style={{ width: LABEL_COL_WIDTH }}
+                              >
+                                {increment.name}
+                              </div>
+                              <div style={{ width: chartWidth }} />
+                            </div>
+                            {rows.map((row) => {
+                              const rangeStatus = dateWindow
+                                ? checkRowAgainstWindow(offset + row.startOffsetWeeks, offset + row.startOffsetWeeks + row.totalDurationWeeks, dateWindow)
+                                : { extendsBefore: false, extendsBeyond: false };
+                              const note = rangeNote(rangeStatus);
+                              return (
+                                <div key={row.initiativeId} className={`flex border-t border-slate-100 ${note ? 'bg-slate-50' : ''}`}>
+                                  <div
+                                    className={`sticky left-0 z-20 flex-shrink-0 pl-9 pr-3 py-2 text-sm flex flex-col gap-0.5 ${note ? 'bg-slate-50 text-slate-400' : 'bg-white text-slate-800'}`}
+                                    style={{ width: LABEL_COL_WIDTH }}
+                                  >
+                                    <div className="flex items-start gap-1">
+                                      <span className="min-w-0 break-words">{row.name}</span>
+                                      {row.warning === 'missing-size' && (
+                                        <span className="shrink-0 text-[10px] text-amber-600 bg-amber-50 px-1 rounded">unsized</span>
+                                      )}
+                                      {row.warning === 'missing-duration' && (
+                                        <span className="shrink-0 text-[10px] text-red-600 bg-red-50 px-1 rounded">missing data</span>
+                                      )}
+                                    </div>
+                                    {note && <span className="text-[10px] italic text-slate-400">{note}</span>}
+                                  </div>
+                                  <div className={`relative h-8 self-center overflow-hidden ${note ? 'opacity-30' : ''}`} style={{ width: chartWidth }}>
+                                    {row.segments.map((seg, i) => (
+                                      <div
+                                        key={i}
+                                        className={`absolute inset-y-1.5 rounded-sm ${colorByPhase.get(seg.phaseName) ?? 'bg-slate-400'}`}
+                                        style={{
+                                          left: `${(offset + seg.startOffsetWeeks - windowStart) * zoom.pixelsPerWeek}px`,
+                                          width: `${Math.max(seg.durationWeeks * zoom.pixelsPerWeek, 2)}px`,
+                                        }}
+                                        title={`${seg.phaseName}: ${seg.displayDuration} ${seg.unitName}${seg.displayDuration === 1 ? '' : 's'}`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}

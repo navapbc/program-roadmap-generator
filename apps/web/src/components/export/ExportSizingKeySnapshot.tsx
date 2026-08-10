@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
+import {
+  buildMilestoneBoundaries,
+  computeFinalSize,
+  computeTimeline,
+  type PhaseUnit,
+  type ScaleUnit,
+  type TimelineInitiativeInput,
+} from '@roadmap/shared';
 import { trpc } from '../../trpc.js';
 import GanttChart, { LABEL_COL_WIDTH } from '../timeline/GanttChart.js';
 import { captureElementAsPng } from '../../lib/timelineScreenshot.js';
@@ -86,11 +93,7 @@ export default function ExportSizingKeySnapshot({
     const phases = key.data.phases.map((p) => ({ id: p.id, name: p.name, unit: p.unit as PhaseUnit, orderIndex: p.orderIndex }));
     const durations = key.data.phases.flatMap((p) => p.durations.map((d) => ({ sizingPhaseId: p.id, labelCode: d.labelCode, durationValue: d.durationValue })));
     const result = computeTimeline({ sequence, phases, durations, startDate });
-    const milestoneBoundaries = project.milestones.map((m) => ({
-      milestoneId: m.id,
-      name: m.name,
-      initiativeIds: m.increments.flatMap((inc) => inc.initiatives.map((i) => i.id)),
-    }));
+    const milestoneBoundaries = buildMilestoneBoundaries(project.milestones);
     return { result, milestoneBoundaries };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key.data]);

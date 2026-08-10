@@ -7,6 +7,7 @@ import { initiativeRouter } from './initiative.js';
 import { sizingKeyRouter } from './sizingKey.js';
 import { timelineRouter } from './timeline.js';
 import { markerRouter } from './marker.js';
+import { combinedViewRouter } from './combinedView.js';
 
 export const appRouter = router({
   project: projectRouter,
@@ -17,6 +18,7 @@ export const appRouter = router({
   sizingKey: sizingKeyRouter,
   timeline: timelineRouter,
   marker: markerRouter,
+  combinedView: combinedViewRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { computeFinalSize, computeTimeline, type PhaseUnit, type ScaleUnit, type TimelineInitiativeInput } from '@roadmap/shared';
+import {
+  buildMilestoneBoundaries,
+  computeFinalSize,
+  computeTimeline,
+  dateRangeToWindow,
+  type PhaseUnit,
+  type ScaleUnit,
+  type TimelineInitiativeInput,
+} from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizingKeySelector from '../components/timeline/SizingKeySelector.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
@@ -20,6 +28,8 @@ export default function TimelinePage() {
 
   const [sizingKeyId, setSizingKeyId] = useState<string | null>(null);
   const [startDateOverride, setStartDateOverride] = useState<string>('');
+  const [rangeStart, setRangeStart] = useState<string>('');
+  const [rangeEnd, setRangeEnd] = useState<string>('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -64,11 +74,7 @@ export default function TimelinePage() {
     );
 
     const result = computeTimeline({ sequence, phases, durations, startDate });
-    const milestoneBoundaries = project.data.milestones.map((m) => ({
-      milestoneId: m.id,
-      name: m.name,
-      initiativeIds: m.increments.flatMap((inc) => inc.initiatives.map((i) => i.id)),
-    }));
+    const milestoneBoundaries = buildMilestoneBoundaries(project.data.milestones);
 
     return { result, milestoneBoundaries };
     // startDate is derived fresh from startDateOverride each render on purpose —
@@ -91,6 +97,16 @@ export default function TimelinePage() {
     data.sprintLengthBusinessDays != null && data.sprintStartWeekday != null
       ? { lengthBusinessDays: data.sprintLengthBusinessDays, startWeekday: data.sprintStartWeekday }
       : null;
+
+  // A date range only means anything against a real calendar — with no
+  // start date there's no origin to measure "current calendar year" etc.
+  // against, so the window stays unbounded (no clipping/greying) until one
+  // is set.
+  const dateWindow = dateRangeToWindow(
+    startDate,
+    rangeStart ? new Date(rangeStart) : null,
+    rangeEnd ? new Date(rangeEnd) : null
+  );
 
   // Markers are real absolute dates — with no start date there's no origin
   // to place them against, so they're simply not shown (rather than guessed).
@@ -171,6 +187,40 @@ export default function TimelinePage() {
             onToggle={toggleScale}
           />
         </div>
+        {startDate && (
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Date range <span className="text-slate-400">(optional — only show this span)</span>
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                className="border border-slate-300 rounded-md px-3 py-2 text-sm"
+                value={rangeStart}
+                onChange={(e) => setRangeStart(e.target.value)}
+              />
+              <span className="text-slate-400 text-sm">to</span>
+              <input
+                type="date"
+                className="border border-slate-300 rounded-md px-3 py-2 text-sm"
+                value={rangeEnd}
+                onChange={(e) => setRangeEnd(e.target.value)}
+              />
+              {(rangeStart || rangeEnd) && (
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:text-slate-900 ml-1"
+                  onClick={() => {
+                    setRangeStart('');
+                    setRangeEnd('');
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {!sizingKeyId && <p className="text-slate-400">Choose a sizing key to generate the timeline.</p>}
@@ -185,6 +235,7 @@ export default function TimelinePage() {
             sprintCadence={sprintCadence}
             markers={markers}
             zoom={zoom}
+            dateWindow={dateWindow}
           />
         </div>
       )}
