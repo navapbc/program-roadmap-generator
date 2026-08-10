@@ -29,7 +29,11 @@ export default function App() {
           </nav>
         </div>
       </header>
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+      {/* No max-width cap here — the Timeline/Combined Timeline routes need the
+          full browser width to fit-to-width against (that's the whole point of
+          "expand to full screen and the chart gets wider"). Every other route
+          applies its own max-width on its own root element instead. */}
+      <main className="flex-1 w-full px-4 py-6">
         <Routes>
           <Route path="/" element={<ProjectListPage />} />
           <Route path="/projects/:projectId" element={<ProjectPage />} />
