@@ -17,7 +17,7 @@ export default function ProjectListPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-xl font-semibold text-slate-900 mb-4">Projects</h1>
+      <h1 className="text-xl font-semibold text-slate-900 mb-4">Programs</h1>
 
       <form
         className="flex gap-2 mb-3"
