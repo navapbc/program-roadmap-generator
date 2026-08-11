@@ -157,8 +157,8 @@ export default function CombinedTimelineView({
               <div key={group.scopeId}>
                 <div className="flex bg-slate-100 border-t border-b border-slate-200">
                   <div
-                    className="sticky left-0 z-20 flex-shrink-0 px-3 py-1 text-xs font-semibold text-slate-600 flex items-center gap-1 bg-slate-100"
-                    style={{ width: LABEL_COL_WIDTH }}
+                    className="sticky left-0 z-20 px-3 py-1 text-xs font-semibold text-slate-600 flex items-center gap-1 bg-slate-100"
+                    style={{ width: LABEL_COL_WIDTH + chartWidth, maxWidth: '100%' }}
                   >
                     {group.label}
                     {isUnanchored && (
@@ -170,7 +170,6 @@ export default function CombinedTimelineView({
                       </span>
                     )}
                   </div>
-                  <div style={{ width: chartWidth }} />
                 </div>
 
                 {group.milestoneBoundaries.map((milestone) => {
