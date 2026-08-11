@@ -72,6 +72,7 @@ export const timelineRouter = router({
       name: p.name,
       unit: p.unit as PhaseUnit,
       orderIndex: p.orderIndex,
+      canOverlap: p.canOverlap,
     }));
     const durations: TimelineDurationInput[] = sizingKey.phases.flatMap((p) =>
       p.durations.map((d) => ({ sizingPhaseId: p.id, labelCode: d.labelCode, durationValue: d.durationValue }))
@@ -79,7 +80,7 @@ export const timelineRouter = router({
 
     const startDate = input.startDateOverride !== undefined ? input.startDateOverride : project.startDate;
 
-    const result = computeTimeline({ sequence, phases, durations, startDate });
+    const result = computeTimeline({ sequence, phases, durations, startDate, maxOverlap: sizingKey.maxOverlap });
 
     return {
       result,

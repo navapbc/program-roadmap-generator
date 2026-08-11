@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { computeTimeline, type TimelineDurationInput, type TimelinePhaseInput } from '../timeline.js';
 
 const phases: TimelinePhaseInput[] = [
-  { id: 'discovery', name: 'Discovery', unit: 'week', orderIndex: 0 },
-  { id: 'impl', name: 'Implementation', unit: 'week', orderIndex: 1 },
-  { id: 'testing', name: 'Testing', unit: 'week', orderIndex: 2 },
+  { id: 'discovery', name: 'Discovery', unit: 'week', orderIndex: 0, canOverlap: false },
+  { id: 'impl', name: 'Implementation', unit: 'week', orderIndex: 1, canOverlap: false },
+  { id: 'testing', name: 'Testing', unit: 'week', orderIndex: 2, canOverlap: false },
 ];
 
 const durations: TimelineDurationInput[] = [
@@ -107,8 +107,71 @@ describe('computeTimeline', () => {
     expect(result.endDate).toBeUndefined();
   });
 
+  describe('phase overlap and max overlap', () => {
+    it('an overlap-capable first phase lets the next initiative start before the first one finishes', () => {
+      const overlapPhases: TimelinePhaseInput[] = [
+        { id: 'discovery', name: 'Discovery', unit: 'week', orderIndex: 0, canOverlap: true },
+        { id: 'impl', name: 'Implementation', unit: 'week', orderIndex: 1, canOverlap: false },
+      ];
+      const overlapDurations: TimelineDurationInput[] = [
+        { sizingPhaseId: 'discovery', labelCode: 'S', durationValue: 2 },
+        { sizingPhaseId: 'impl', labelCode: 'S', durationValue: 4 },
+      ];
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null },
+          { initiativeId: 'i2', name: 'Second', finalSizeCode: 'S', timeEstimateWeeks: null },
+        ],
+        phases: overlapPhases,
+        durations: overlapDurations,
+        maxOverlap: 2,
+      });
+
+      // Second's overlap-capable Discovery starts at week 0 alongside First's,
+      // but Second's non-overlap Implementation waits for First's to finish.
+      expect(result.rows[0].startOffsetWeeks).toBe(0);
+      expect(result.rows[1].startOffsetWeeks).toBe(0);
+      expect(result.rows[1].segments[1].startOffsetWeeks).toBe(6); // First's Implementation ends at week 6
+    });
+
+    it('a non-overlap phase still blocks even when maxOverlap is high', () => {
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null },
+          { initiativeId: 'i2', name: 'Second', finalSizeCode: 'S', timeEstimateWeeks: null },
+        ],
+        phases,
+        durations,
+        maxOverlap: 10,
+      });
+
+      expect(result.rows[0].startOffsetWeeks).toBe(0);
+      expect(result.rows[1].startOffsetWeeks).toBe(8);
+    });
+
+    it('maxOverlap caps concurrency even when phases are overlap-capable', () => {
+      const allOverlapPhases: TimelinePhaseInput[] = [{ id: 'build', name: 'Build', unit: 'week', orderIndex: 0, canOverlap: true }];
+      const allOverlapDurations: TimelineDurationInput[] = [{ sizingPhaseId: 'build', labelCode: 'S', durationValue: 4 }];
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null },
+          { initiativeId: 'i2', name: 'Second', finalSizeCode: 'S', timeEstimateWeeks: null },
+          { initiativeId: 'i3', name: 'Third', finalSizeCode: 'S', timeEstimateWeeks: null },
+        ],
+        phases: allOverlapPhases,
+        durations: allOverlapDurations,
+        maxOverlap: 2,
+      });
+
+      expect(result.rows[0].startOffsetWeeks).toBe(0);
+      expect(result.rows[1].startOffsetWeeks).toBe(0);
+      // Third must wait for a slot to free — First and Second both end at week 4.
+      expect(result.rows[2].startOffsetWeeks).toBe(4);
+    });
+  });
+
   describe('month-unit phases use real calendar lengths, not an average', () => {
-    const monthPhases: TimelinePhaseInput[] = [{ id: 'build', name: 'Build', unit: 'month', orderIndex: 0 }];
+    const monthPhases: TimelinePhaseInput[] = [{ id: 'build', name: 'Build', unit: 'month', orderIndex: 0, canOverlap: false }];
     const monthDurations: TimelineDurationInput[] = [{ sizingPhaseId: 'build', labelCode: 'M', durationValue: 1 }];
 
     it('a 1-month phase starting Jan 1 spans exactly January (31 days)', () => {

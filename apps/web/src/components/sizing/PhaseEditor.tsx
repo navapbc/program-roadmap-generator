@@ -9,6 +9,7 @@ interface Phase {
   name: string;
   unit: string;
   orderIndex: number;
+  canOverlap: boolean;
 }
 
 export default function PhaseEditor({ sizingKeyId, phases }: { sizingKeyId: string; phases: Phase[] }) {
@@ -39,6 +40,7 @@ export default function PhaseEditor({ sizingKeyId, phases }: { sizingKeyId: stri
             <th className="px-3 py-2 w-16"></th>
             <th className="px-3 py-2">Phase</th>
             <th className="px-3 py-2">Unit</th>
+            <th className="px-3 py-2">Can overlap</th>
             <th className="px-3 py-2"></th>
           </tr>
         </thead>
@@ -78,6 +80,13 @@ export default function PhaseEditor({ sizingKeyId, phases }: { sizingKeyId: stri
                   ))}
                 </select>
               </td>
+              <td className="px-3 py-2 text-center">
+                <input
+                  type="checkbox"
+                  checked={phase.canOverlap}
+                  onChange={(e) => renamePhase.mutate({ id: phase.id, canOverlap: e.target.checked })}
+                />
+              </td>
               <td className="px-3 py-2 text-right">
                 <button className="text-red-400 hover:text-red-700 text-xs" onClick={() => deletePhase.mutate({ id: phase.id })} type="button">
                   Delete
@@ -87,7 +96,7 @@ export default function PhaseEditor({ sizingKeyId, phases }: { sizingKeyId: stri
           ))}
           {sorted.length === 0 && (
             <tr>
-              <td className="px-3 py-4 text-center text-slate-400" colSpan={4}>
+              <td className="px-3 py-4 text-center text-slate-400" colSpan={5}>
                 No phases yet.
               </td>
             </tr>

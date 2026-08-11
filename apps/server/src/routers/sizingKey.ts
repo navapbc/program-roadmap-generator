@@ -62,12 +62,14 @@ export const sizingKeyRouter = router({
       data: {
         name: input.newName,
         description: source.description,
+        maxOverlap: source.maxOverlap,
         labels: { create: source.labels.map((l) => ({ code: l.code, orderIndex: l.orderIndex })) },
         phases: {
           create: source.phases.map((p) => ({
             name: p.name,
             unit: p.unit,
             orderIndex: p.orderIndex,
+            canOverlap: p.canOverlap,
             durations: { create: p.durations.map((d) => ({ labelCode: d.labelCode, durationValue: d.durationValue })) },
           })),
         },
@@ -159,7 +161,13 @@ export const sizingKeyRouter = router({
       orderBy: { orderIndex: 'asc' },
     });
     const created = await ctx.prisma.sizingPhase.create({
-      data: { sizingKeyId: input.sizingKeyId, name: input.name, unit: input.unit, orderIndex: existing.length },
+      data: {
+        sizingKeyId: input.sizingKeyId,
+        name: input.name,
+        unit: input.unit,
+        orderIndex: existing.length,
+        canOverlap: input.canOverlap,
+      },
     });
     if (input.afterId) {
       const newOrder = reinsertAfter([...existing.map((p) => p.id), created.id], created.id, input.afterId);

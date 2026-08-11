@@ -276,9 +276,13 @@ Initiatives are grouped under grey milestone header rows, in the order you arran
 initiative gets a bar split into coloured segments, one per phase, with a legend along the bottom.
 Hover a segment for its phase name and duration.
 
-**Everything runs strictly back to back.** No two initiatives overlap; each starts when the previous
-one ends. The tool models a single sequential stream of work, not parallel teams, so a "timeline"
-here is really "how long this ordered pile of work takes."
+**By default, everything runs strictly back to back.** Each initiative starts when the previous one
+ends, unless the sizing key says otherwise. A sizing key can mark individual phases as able to
+overlap other phases (see the sizing key editor), and can set a "max overlap" — the most initiatives
+allowed to be active at once, regardless of phase. With both left at their defaults, the tool models
+a single sequential stream of work, so a "timeline" here is really "how long this ordered pile of
+work takes." Turning on overlap for a phase (say, Discovery) lets that phase run alongside other
+initiatives' phases, while non-overlap phases (say, Implementation) still hold up the queue.
 
 ### Badges to watch for
 
@@ -364,8 +368,11 @@ Sprint cadence needs *both* a length and a start weekday, and the project needs 
 The new initiatives are probably unsized, contributing zero. Look for amber `unsized` badges.
 
 **How do I model two teams working in parallel?**
-You cannot within one project — scheduling is strictly sequential. The nearest approach is separate
-projects (or separate milestones) shown together on the Combined Timeline.
+Within one project, mark the relevant phase(s) as "can overlap" on the sizing key, and raise its
+"max overlap" setting to however many initiatives can genuinely be in flight at once. For example,
+marking Discovery as overlap-capable lets one initiative's Discovery run while another is mid-Build.
+Left at the defaults, scheduling stays strictly sequential. You can still show separate projects (or
+milestones) together on the Combined Timeline for teams that don't share a sizing key at all.
 
 **How do I share a roadmap?**
 There is no export yet. Screenshot the timeline, or have colleagues run their own copy. Note that
