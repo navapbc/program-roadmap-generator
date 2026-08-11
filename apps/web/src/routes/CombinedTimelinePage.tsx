@@ -192,10 +192,12 @@ export default function CombinedTimelinePage() {
   });
   const updateView = trpc.combinedView.update.useMutation({ onSuccess: () => utils.combinedView.list.invalidate() });
   const deleteView = trpc.combinedView.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       utils.combinedView.list.invalidate();
-      setViewId(null);
-      setViewName('');
+      if (variables.id === viewId) {
+        setViewId(null);
+        setViewName('');
+      }
     },
   });
 
@@ -258,28 +260,48 @@ export default function CombinedTimelinePage() {
 
   return (
     <div>
+      <div className="max-w-2xl mx-auto">
       <h1 className="text-xl font-semibold text-slate-900 mb-2">Combined Timeline</h1>
       <p className="text-sm text-slate-500 mb-4">
         Compare multiple projects — down to a specific milestone or increment — on one shared axis, each with its own
         sizing key.
       </p>
 
-      <div className="flex flex-wrap items-end gap-3 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-md">
-        <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Saved view</label>
-          <select
-            className="border border-slate-300 rounded-md px-2 py-1 text-sm"
-            value={viewId ?? ''}
-            onChange={(e) => loadView(e.target.value)}
-          >
-            <option value="">New (unsaved) view</option>
-            {savedViews.data?.map((v) => (
-              <option key={v.id} value={v.id}>
+      <div className="mb-4">
+        <h2 className="text-xs font-medium text-slate-500 mb-1">Saved views</h2>
+        <ul className="divide-y divide-slate-200 border border-slate-200 rounded-md bg-white">
+          <li className={`px-4 py-2 flex items-center justify-between ${viewId === null ? 'bg-slate-100' : ''}`}>
+            <button
+              type="button"
+              className={viewId === null ? 'font-medium text-slate-900' : 'text-slate-700 hover:underline'}
+              onClick={() => loadView('')}
+            >
+              New (unsaved) view
+            </button>
+          </li>
+          {savedViews.data?.map((v) => (
+            <li key={v.id} className={`px-4 py-2 flex items-center justify-between ${viewId === v.id ? 'bg-slate-100' : ''}`}>
+              <button
+                type="button"
+                className={viewId === v.id ? 'font-medium text-slate-900' : 'text-slate-700 hover:underline'}
+                onClick={() => loadView(v.id)}
+              >
                 {v.name}
-              </option>
-            ))}
-          </select>
-        </div>
+              </button>
+              <button
+                type="button"
+                className="text-sm text-red-400 hover:text-red-700"
+                onClick={() => window.confirm(`Delete the saved view "${v.name}"?`) && deleteView.mutate({ id: v.id })}
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+          {savedViews.data?.length === 0 && <li className="px-4 py-6 text-center text-slate-400">No saved views yet.</li>}
+        </ul>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-md">
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">Name</label>
           <input
@@ -298,18 +320,9 @@ export default function CombinedTimelinePage() {
           {viewId ? 'Update' : 'Save'}
         </button>
         {viewId && (
-          <>
-            <button type="button" className="text-sm text-slate-500 hover:text-slate-900" onClick={saveAsNew}>
-              Save as new
-            </button>
-            <button
-              type="button"
-              className="text-sm text-red-400 hover:text-red-700"
-              onClick={() => window.confirm(`Delete the saved view "${viewName}"?`) && deleteView.mutate({ id: viewId })}
-            >
-              Delete
-            </button>
-          </>
+          <button type="button" className="text-sm text-slate-500 hover:text-slate-900" onClick={saveAsNew}>
+            Save as new
+          </button>
         )}
       </div>
 
@@ -379,6 +392,7 @@ export default function CombinedTimelinePage() {
           )}
         </div>
       )}
+      </div>
 
       {groups.length > 0 && <CombinedTimelineView groups={groups} scales={scales} zoom={zoom} dateWindow={dateWindow} />}
     </div>
