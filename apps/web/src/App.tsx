@@ -18,7 +18,7 @@ export default function App() {
           <span className="font-semibold text-slate-900">Program Roadmap Generator</span>
           <nav className="flex gap-1">
             <NavLink to="/" className={navLinkClass} end>
-              Projects
+              Programs
             </NavLink>
             <NavLink to="/sizing-keys" className={navLinkClass}>
               Sizing Keys
