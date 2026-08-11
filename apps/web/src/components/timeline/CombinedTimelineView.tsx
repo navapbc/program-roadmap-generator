@@ -195,12 +195,11 @@ export default function CombinedTimelineView({
                           <div key={increment.incrementId}>
                             <div className="flex border-t border-slate-100">
                               <div
-                                className="sticky left-0 z-20 flex-shrink-0 pl-6 pr-3 py-1 text-xs font-medium text-slate-400 bg-white"
-                                style={{ width: LABEL_COL_WIDTH }}
+                                className="sticky left-0 z-20 pl-6 pr-3 py-1 text-xs font-medium text-slate-400 bg-white"
+                                style={{ width: LABEL_COL_WIDTH + chartWidth, maxWidth: '100%' }}
                               >
                                 {increment.name}
                               </div>
-                              <div style={{ width: chartWidth }} />
                             </div>
                             {rows.map((row) => {
                               const rangeStatus = dateWindow
