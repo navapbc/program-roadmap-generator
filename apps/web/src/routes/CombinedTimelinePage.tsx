@@ -145,7 +145,7 @@ export default function CombinedTimelinePage() {
 
       result.push({
         scopeId: scope.localId,
-        label: [project.name, milestoneLabel, incrementLabel].filter(Boolean).join(' — '),
+        label: `${[project.name, milestoneLabel, incrementLabel].filter(Boolean).join(' — ')} (${key.name})`,
         startDate,
         sprintCadence,
         totalDurationWeeks: computed.totalDurationWeeks,
