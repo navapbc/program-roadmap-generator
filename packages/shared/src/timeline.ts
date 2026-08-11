@@ -127,6 +127,37 @@ function unitDurationDays(unit: PhaseUnit, displayDuration: number, currentDate:
   }
 }
 
+interface DayInterval {
+  start: number;
+  end: number;
+}
+
+// Half-open interval overlap test: [aStart, aEnd) vs [bStart, bEnd).
+function intervalsOverlap(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+// Latest end-day among intervals in `busy` that overlap [start, end), or null
+// if none conflict. Taking the latest (not first) conflict's end means a
+// single pass resolves every overlapping booking at once.
+function latestConflictEnd(busy: DayInterval[], start: number, end: number): number | null {
+  let result: number | null = null;
+  for (const iv of busy) {
+    if (intervalsOverlap(start, end, iv.start, iv.end) && (result === null || iv.end > result)) {
+      result = iv.end;
+    }
+  }
+  return result;
+}
+
+interface PendingSegment {
+  phase: TimelinePhaseInput;
+  displayDuration: number;
+  startDays: number;
+  durationDays: number;
+  startDate: Date | null;
+}
+
 /**
  * Schedules a flattened, already-ordered sequence of initiatives, splitting
  * each sized initiative's bar into one segment per phase per the selected
@@ -134,16 +165,21 @@ function unitDurationDays(unit: PhaseUnit, displayDuration: number, currentDate:
  * server (initial load) and in the browser (instant recompute when the
  * sizing key or start date changes).
  *
- * Concurrency model: every non-overlap-capable phase shares one exclusive
- * lock across the whole schedule — only one initiative may be inside such a
- * phase at a time, so a later initiative's non-overlap phase waits for the
- * earlier one's to finish. An overlap-capable phase holds no lock, so other
- * initiatives may run in any phase at the same time. `maxOverlap` is an
- * additional hard ceiling on how many initiatives may be active at once,
- * independent of phase. When every phase is non-overlap (the default), the
- * lock is held continuously from an initiative's first phase to its last,
- * which reduces to the old strictly-sequential behavior regardless of
- * `maxOverlap` — the lock dominates the cap until a phase opts in.
+ * Concurrency model: each non-overlap-capable phase is its own exclusive
+ * resource, tracked independently by phase id — only one initiative may be
+ * inside a *given* phase at a time, but two initiatives may be in two
+ * different non-overlap phases simultaneously (they're different teams/
+ * resources). An overlap-capable phase holds no lock at all. `maxOverlap` is
+ * an additional hard ceiling on how many initiatives may be active at once,
+ * independent of phase.
+ *
+ * Within a single initiative, phases are always scheduled back-to-back with
+ * no internal gaps: the whole phase block is placed as one contiguous unit,
+ * at the earliest start day where every non-overlap phase in it clears its
+ * own resource's existing bookings. This can push overlap-capable phases
+ * later than their resource alone would require, so that a later phase's
+ * exclusivity constraint is never satisfied by leaving a gap earlier in the
+ * same initiative's bar.
  *
  * Internally tracks elapsed time in days (the only unit day/week/month can
  * all convert to without an average standing in for "month"), converting to
@@ -157,8 +193,14 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
   const orderedPhases = [...phases].sort((a, b) => a.orderIndex - b.orderIndex);
   const durationByKey = new Map(durations.map((d) => [`${d.sizingPhaseId}::${d.labelCode}`, d.durationValue]));
 
-  // Next day the shared exclusive resource (all non-overlap phases) is free.
-  let resourceFreeAt = 0;
+  // Booked intervals per non-overlap phase id — each phase is an independent
+  // exclusive resource.
+  const resourceBusyByPhase = new Map<string, DayInterval[]>();
+  // Booked intervals for initiatives with no phase data at all: since we
+  // don't know which specific phase(s) they'd occupy, they're checked and
+  // booked against every non-overlap phase's resource (conservative default:
+  // "unknown means don't assume it's safe to run alongside anything else").
+  const globalBusy: DayInterval[] = [];
   // End day of every already-scheduled initiative, used to enforce maxOverlap.
   const activeEnds: number[] = [];
   // Floor for the next initiative's start, so starts stay in backlog order.
@@ -175,67 +217,106 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
     return Math.max(minNextStart, threshold);
   }
 
+  // Lays out orderedPhases back-to-back starting at `blockStart`, with no
+  // gaps between them — durations (month-unit ones especially) are computed
+  // fresh since they depend on the actual calendar date each phase lands on.
+  function computeSegmentsAt(initiative: TimelineInitiativeInput, blockStart: number) {
+    let cursor = blockStart;
+    let missingDuration = false;
+    const segments: PendingSegment[] = [];
+    for (const phase of orderedPhases) {
+      const key = `${phase.id}::${initiative.finalSizeCode}`;
+      const rawDuration = durationByKey.get(key);
+      if (rawDuration === undefined) missingDuration = true;
+      const displayDuration = rawDuration ?? 0;
+      const segmentStartDate = startDate ? addDays(startDate, cursor) : null;
+      const durationDays = unitDurationDays(phase.unit, displayDuration, segmentStartDate);
+      segments.push({ phase, displayDuration, startDays: cursor, durationDays, startDate: segmentStartDate });
+      cursor += durationDays;
+    }
+    return { segments, cursor, missingDuration };
+  }
+
+  // Finds the earliest blockStart >= floor at which every non-overlap phase
+  // in the (contiguous) block clears its own resource's existing bookings.
+  // Each pass computes the block at the current candidate, finds the latest
+  // conflict end across all its non-overlap phases, and re-anchors the whole
+  // block there — never leaving a gap between phases to dodge a conflict.
+  function findEarliestBlockStart(initiative: TimelineInitiativeInput, floor: number) {
+    let blockStart = floor;
+    for (;;) {
+      const attempt = computeSegmentsAt(initiative, blockStart);
+      let bump = blockStart;
+      for (const seg of attempt.segments) {
+        if (seg.phase.canOverlap || seg.durationDays <= 0) continue;
+        const busy = resourceBusyByPhase.get(seg.phase.id) ?? [];
+        const conflictEnd = latestConflictEnd([...busy, ...globalBusy], seg.startDays, seg.startDays + seg.durationDays);
+        if (conflictEnd !== null) {
+          const requiredStart = blockStart + (conflictEnd - seg.startDays);
+          if (requiredStart > bump) bump = requiredStart;
+        }
+      }
+      if (bump === blockStart) return attempt;
+      blockStart = bump;
+    }
+  }
+
   for (const initiative of sequence) {
     if (initiative.finalSizeCode) {
       const capacityStart = capacityGatedStart();
-      let localCursor = capacityStart;
-      let rowStartDays: number | null = null;
-      const segments: TimelineSegment[] = [];
-      let missingDuration = false;
+      const { segments: pending, cursor, missingDuration } = findEarliestBlockStart(initiative, capacityStart);
+      const rowStartDays = pending.length > 0 ? pending[0].startDays : capacityStart;
 
-      for (const phase of orderedPhases) {
-        const key = `${phase.id}::${initiative.finalSizeCode}`;
-        const rawDuration = durationByKey.get(key);
-        if (rawDuration === undefined) missingDuration = true;
-        const displayDuration = rawDuration ?? 0;
-
-        const phaseStart = phase.canOverlap ? localCursor : Math.max(localCursor, resourceFreeAt);
-        if (rowStartDays === null) rowStartDays = phaseStart;
-
-        const segmentStartDate = startDate ? addDays(startDate, phaseStart) : null;
-        const durationDays = unitDurationDays(phase.unit, displayDuration, segmentStartDate);
-        const segmentEndDate = segmentStartDate ? addDays(segmentStartDate, durationDays) : undefined;
-
-        segments.push({
-          phaseId: phase.id,
-          phaseName: phase.name,
-          unitName: phase.unit,
-          displayDuration,
-          startOffsetWeeks: phaseStart / DAYS_PER_WEEK,
-          durationWeeks: durationDays / DAYS_PER_WEEK,
-          startDate: segmentStartDate ?? undefined,
-          endDate: segmentEndDate,
-        });
-
-        localCursor = phaseStart + durationDays;
-        if (!phase.canOverlap) resourceFreeAt = localCursor;
+      for (const seg of pending) {
+        if (seg.phase.canOverlap || seg.durationDays <= 0) continue;
+        const list = resourceBusyByPhase.get(seg.phase.id) ?? [];
+        list.push({ start: seg.startDays, end: seg.startDays + seg.durationDays });
+        resourceBusyByPhase.set(seg.phase.id, list);
       }
 
-      rowStartDays ??= capacityStart;
-      const totalDurationDays = localCursor - rowStartDays;
+      const segments: TimelineSegment[] = pending.map((seg) => ({
+        phaseId: seg.phase.id,
+        phaseName: seg.phase.name,
+        unitName: seg.phase.unit,
+        displayDuration: seg.displayDuration,
+        startOffsetWeeks: seg.startDays / DAYS_PER_WEEK,
+        durationWeeks: seg.durationDays / DAYS_PER_WEEK,
+        startDate: seg.startDate ?? undefined,
+        endDate: seg.startDate ? addDays(seg.startDate, seg.durationDays) : undefined,
+      }));
+
       rows.push({
         initiativeId: initiative.initiativeId,
         name: initiative.name,
         kind: 'sized',
         startOffsetWeeks: rowStartDays / DAYS_PER_WEEK,
-        totalDurationWeeks: totalDurationDays / DAYS_PER_WEEK,
+        totalDurationWeeks: (cursor - rowStartDays) / DAYS_PER_WEEK,
         startDate: startDate ? addDays(startDate, rowStartDays) : undefined,
-        endDate: startDate ? addDays(startDate, localCursor) : undefined,
+        endDate: startDate ? addDays(startDate, cursor) : undefined,
         segments,
         warning: missingDuration ? 'missing-duration' : undefined,
       });
 
       minNextStart = rowStartDays;
-      activeEnds.push(localCursor);
-      overallEndDays = Math.max(overallEndDays, localCursor);
+      activeEnds.push(cursor);
+      overallEndDays = Math.max(overallEndDays, cursor);
     } else if (initiative.timeEstimateWeeks != null) {
-      // No phase data to consult, so treat this as a single non-overlap
-      // block — conservative default, consistent with "unknown means don't
-      // assume it's safe to run alongside anything else."
+      // No phase data to consult, so treat this as a single block checked
+      // against every non-overlap phase's resource — conservative default,
+      // consistent with "unknown means don't assume it's safe to run
+      // alongside anything else."
       const capacityStart = capacityGatedStart();
-      const rowStartDays = Math.max(capacityStart, resourceFreeAt);
       const durationDays = initiative.timeEstimateWeeks * DAYS_PER_WEEK;
+      let rowStartDays = capacityStart;
+      for (;;) {
+        const allBusy = [...Array.from(resourceBusyByPhase.values()).flat(), ...globalBusy];
+        const conflictEnd = latestConflictEnd(allBusy, rowStartDays, rowStartDays + durationDays);
+        if (conflictEnd === null) break;
+        rowStartDays = conflictEnd;
+      }
       const rowEndDays = rowStartDays + durationDays;
+      globalBusy.push({ start: rowStartDays, end: rowEndDays });
+
       const segmentStartDate = startDate ? addDays(startDate, rowStartDays) : undefined;
       const segments: TimelineSegment[] = [
         {
@@ -260,7 +341,6 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
         segments,
       });
 
-      resourceFreeAt = rowEndDays;
       minNextStart = rowStartDays;
       activeEnds.push(rowEndDays);
       overallEndDays = Math.max(overallEndDays, rowEndDays);
