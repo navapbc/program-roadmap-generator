@@ -81,30 +81,30 @@ describe('computeScaleTicks', () => {
 });
 
 describe('isDayScaleReadable', () => {
-  it('is false when a day tick would render narrower than its own label', () => {
+  it('is false everywhere in the zoom range — a day tick never gets enough of its 1/7-week share to fit "D01"', () => {
     expect(isDayScaleReadable(4)).toBe(false); // zoom min
     expect(isDayScaleReadable(24)).toBe(false); // zoom default
-  });
-
-  it('is true once a day tick has room for a 2-digit label', () => {
-    expect(isDayScaleReadable(200)).toBe(true); // zoom max
+    expect(isDayScaleReadable(200)).toBe(false); // zoom max
   });
 });
 
 describe('isWeekScaleReadable', () => {
-  it('is false when a week tick would render narrower than its own label', () => {
+  it('is false until a week tick is wide enough for its "W01"-style label, not just once it has some room', () => {
     expect(isWeekScaleReadable(4)).toBe(false); // zoom min
+    expect(isWeekScaleReadable(24)).toBe(false); // zoom default — was wrongly "readable" before the threshold fix, rendering a clipped "W"
   });
 
-  it('is true once a week tick has room for a 2-digit label', () => {
-    expect(isWeekScaleReadable(24)).toBe(true); // zoom default
+  it('is true once a week tick has room for its full "W01"-style label', () => {
     expect(isWeekScaleReadable(200)).toBe(true); // zoom max
   });
 });
 
 describe('isMonthScaleReadable', () => {
-  it('is true across the whole zoom range — a month tick is wide even at the zoom floor', () => {
-    expect(isMonthScaleReadable(4)).toBe(true); // zoom min
+  it('is false at the very bottom of the zoom range — even an average month tick is too narrow there', () => {
+    expect(isMonthScaleReadable(4)).toBe(false); // zoom min
+  });
+
+  it('is true once zoomed in past the zoom default', () => {
     expect(isMonthScaleReadable(24)).toBe(true); // zoom default
   });
 });

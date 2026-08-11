@@ -5,9 +5,13 @@ const WEEK_TICK_WIDTH_WEEKS = 1;
 // "would this tick be legible" gate (the tick's own rendered width is
 // still computed from the real calendar boundary, never this average).
 const AVERAGE_MONTH_WEEKS = 30.44 / DAYS_PER_WEEK;
-// Below this a tick renders narrower than its own 2-digit label needs —
-// not just tight, the number gets truncated. Chosen for the 10px tick font.
-const MIN_TICK_PX = 14;
+// Below this a tick renders narrower than its own label needs — not just
+// tight, the label gets truncated. The day/week labels aren't just 2 digits,
+// they're a prefix letter plus 2 digits ("D01", "W99"), which at the 10px
+// tick font needs ~23px of text; add the tick's px-1 padding (8px) and
+// right border (1px) and the tick itself needs to be ~32px wide before its
+// label stops clipping.
+const MIN_TICK_PX = 32;
 
 export type ScaleUnit = 'day' | 'week' | 'month' | 'sprint' | 'quarter' | 'year';
 
