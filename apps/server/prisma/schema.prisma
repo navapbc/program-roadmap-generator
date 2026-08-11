@@ -113,6 +113,12 @@ model SizingKey {
   id          String   @id @default(cuid())
   name        String
   description String?
+  // Max number of initiatives that may be actively in progress at once,
+  // regardless of phase. Safe to default above 1 for existing keys: while
+  // every phase is non-overlapping (today's default), the shared exclusive
+  // lock in computeTimeline() dominates this cap and the schedule stays
+  // fully sequential until a phase is explicitly marked overlap-capable.
+  maxOverlap  Int      @default(2)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -135,7 +141,7 @@ model SizingKeyLabel {
 }
 
 model SizingPhase {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   sizingKeyId String
   name        String
   // 'day' | 'week' | 'month' — plain string + app-level Zod validation
@@ -143,6 +149,11 @@ model SizingPhase {
   // CHECK constraint pattern used elsewhere for SQLite.
   unit        String
   orderIndex  Int
+  // When false (default), this phase holds a shared exclusive lock in
+  // computeTimeline() — only one initiative may be inside it at a time,
+  // across the whole schedule. When true, it holds no lock and other
+  // initiatives may run in any phase at the same time.
+  canOverlap  Boolean @default(false)
 
   sizingKey SizingKey        @relation(fields: [sizingKeyId], references: [id], onDelete: Cascade)
   durations SizingDuration[]

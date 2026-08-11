@@ -33,6 +33,20 @@ export default function SizingKeyEditorPage() {
           defaultValue={data.description ?? ''}
           onBlur={(e) => e.target.value !== (data.description ?? '') && update.mutate({ id: data.id, description: e.target.value })}
         />
+        <label className="flex items-center gap-2 text-sm text-slate-600 mt-2">
+          Max overlap
+          <input
+            className="w-16 border border-slate-300 rounded px-2 py-1"
+            type="number"
+            min={1}
+            defaultValue={data.maxOverlap}
+            onBlur={(e) => {
+              const value = Math.max(1, Math.round(Number(e.target.value)));
+              if (value !== data.maxOverlap) update.mutate({ id: data.id, maxOverlap: value });
+            }}
+          />
+          <span className="text-xs text-slate-400">Max initiatives active at once, regardless of phase.</span>
+        </label>
       </div>
 
       <div>
@@ -46,9 +60,10 @@ export default function SizingKeyEditorPage() {
       <div>
         <h2 className="text-sm font-semibold text-slate-700 mb-2">Phases</h2>
         <p className="text-xs text-slate-400 mb-2">
-          Each phase runs in sequence and can be measured in days, weeks, or months. Month durations use each real
-          calendar month's actual length once a project has a start date (Feb ≠ Jan), not a flat average — so a
-          month boundary can land mid-week on the Timeline.
+          Each phase can be measured in days, weeks, or months. Month durations use each real calendar month's
+          actual length once a project has a start date (Feb ≠ Jan), not a flat average — so a month boundary can
+          land mid-week on the Timeline. By default a phase blocks every other initiative from running at the same
+          time; check "Can overlap" to let other initiatives proceed in any phase while this one is in progress.
         </p>
         <PhaseEditor sizingKeyId={data.id} phases={data.phases} />
       </div>

@@ -68,12 +68,18 @@ export default function TimelinePage() {
       )
     );
 
-    const phases = selectedKey.data.phases.map((p) => ({ id: p.id, name: p.name, unit: p.unit as PhaseUnit, orderIndex: p.orderIndex }));
+    const phases = selectedKey.data.phases.map((p) => ({
+      id: p.id,
+      name: p.name,
+      unit: p.unit as PhaseUnit,
+      orderIndex: p.orderIndex,
+      canOverlap: p.canOverlap,
+    }));
     const durations = selectedKey.data.phases.flatMap((p) =>
       p.durations.map((d) => ({ sizingPhaseId: p.id, labelCode: d.labelCode, durationValue: d.durationValue }))
     );
 
-    const result = computeTimeline({ sequence, phases, durations, startDate });
+    const result = computeTimeline({ sequence, phases, durations, startDate, maxOverlap: selectedKey.data.maxOverlap });
     const milestoneBoundaries = buildMilestoneBoundaries(project.data.milestones);
 
     return { result, milestoneBoundaries };

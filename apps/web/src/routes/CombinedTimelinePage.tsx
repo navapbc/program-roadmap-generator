@@ -117,10 +117,16 @@ export default function CombinedTimelinePage() {
         )
       );
 
-      const phases = key.phases.map((p) => ({ id: p.id, name: p.name, unit: p.unit as PhaseUnit, orderIndex: p.orderIndex }));
+      const phases = key.phases.map((p) => ({
+        id: p.id,
+        name: p.name,
+        unit: p.unit as PhaseUnit,
+        orderIndex: p.orderIndex,
+        canOverlap: p.canOverlap,
+      }));
       const durations = key.phases.flatMap((p) => p.durations.map((d) => ({ sizingPhaseId: p.id, labelCode: d.labelCode, durationValue: d.durationValue })));
 
-      const computed = computeTimeline({ sequence, phases, durations, startDate });
+      const computed = computeTimeline({ sequence, phases, durations, startDate, maxOverlap: key.maxOverlap });
       const milestoneBoundaries = buildMilestoneBoundaries(milestones);
       const milestoneLabel = scope.milestoneId ? milestones[0]?.name : null;
       const incrementLabel = scope.incrementId ? milestones[0]?.increments[0]?.name : null;

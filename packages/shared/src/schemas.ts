@@ -102,6 +102,7 @@ export const updateSizingKeySchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  maxOverlap: z.number().int().min(1).optional(),
 });
 
 export const duplicateSizingKeySchema = z.object({
@@ -130,12 +131,14 @@ export const addSizingPhaseSchema = z.object({
   name: z.string().min(1),
   unit: phaseUnitSchema,
   afterId: idSchema.nullable().optional(),
+  canOverlap: z.boolean().optional(),
 });
 
 export const renameSizingPhaseSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
   unit: phaseUnitSchema.optional(),
+  canOverlap: z.boolean().optional(),
 });
 
 export const setSizingDurationSchema = z.object({

@@ -15,6 +15,7 @@ export interface TimelinePhaseInput {
   name: string;
   unit: PhaseUnit;
   orderIndex: number;
+  canOverlap: boolean;
 }
 
 export interface TimelineDurationInput {
@@ -27,6 +28,10 @@ export interface TimelineInput {
   sequence: TimelineInitiativeInput[];
   phases: TimelinePhaseInput[];
   durations: TimelineDurationInput[];
+  // Max number of initiatives that may be active at once, regardless of
+  // phase. Defaults to 1 (fully sequential) when omitted — not load-bearing
+  // for real data since the server always supplies the sizing key's value.
+  maxOverlap?: number;
   startDate?: Date | null;
 }
 
@@ -123,11 +128,22 @@ function unitDurationDays(unit: PhaseUnit, displayDuration: number, currentDate:
 }
 
 /**
- * Schedules a flattened, already-ordered sequence of initiatives strictly
- * back-to-back (no overlap), splitting each sized initiative's bar into one
- * segment per phase per the selected sizing key's durations. Pure function —
- * safe to call identically on the server (initial load) and in the browser
- * (instant recompute when the sizing key or start date changes).
+ * Schedules a flattened, already-ordered sequence of initiatives, splitting
+ * each sized initiative's bar into one segment per phase per the selected
+ * sizing key's durations. Pure function — safe to call identically on the
+ * server (initial load) and in the browser (instant recompute when the
+ * sizing key or start date changes).
+ *
+ * Concurrency model: every non-overlap-capable phase shares one exclusive
+ * lock across the whole schedule — only one initiative may be inside such a
+ * phase at a time, so a later initiative's non-overlap phase waits for the
+ * earlier one's to finish. An overlap-capable phase holds no lock, so other
+ * initiatives may run in any phase at the same time. `maxOverlap` is an
+ * additional hard ceiling on how many initiatives may be active at once,
+ * independent of phase. When every phase is non-overlap (the default), the
+ * lock is held continuously from an initiative's first phase to its last,
+ * which reduces to the old strictly-sequential behavior regardless of
+ * `maxOverlap` — the lock dominates the cap until a phase opts in.
  *
  * Internally tracks elapsed time in days (the only unit day/week/month can
  * all convert to without an average standing in for "month"), converting to
@@ -136,17 +152,34 @@ function unitDurationDays(unit: PhaseUnit, displayDuration: number, currentDate:
  */
 export function computeTimeline(input: TimelineInput): TimelineResult {
   const { sequence, phases, durations, startDate } = input;
+  const maxOverlap = Math.max(1, input.maxOverlap ?? 1);
 
   const orderedPhases = [...phases].sort((a, b) => a.orderIndex - b.orderIndex);
   const durationByKey = new Map(durations.map((d) => [`${d.sizingPhaseId}::${d.labelCode}`, d.durationValue]));
 
-  let cursorDays = 0;
+  // Next day the shared exclusive resource (all non-overlap phases) is free.
+  let resourceFreeAt = 0;
+  // End day of every already-scheduled initiative, used to enforce maxOverlap.
+  const activeEnds: number[] = [];
+  // Floor for the next initiative's start, so starts stay in backlog order.
+  let minNextStart = 0;
+  let overallEndDays = 0;
   const rows: TimelineRow[] = [];
 
-  for (const initiative of sequence) {
-    const rowStartDays = cursorDays;
+  // Earliest day >= minNextStart at which fewer than maxOverlap
+  // already-scheduled initiatives are still active.
+  function capacityGatedStart(): number {
+    if (activeEnds.length < maxOverlap) return minNextStart;
+    const sorted = [...activeEnds].sort((a, b) => a - b);
+    const threshold = sorted[sorted.length - maxOverlap];
+    return Math.max(minNextStart, threshold);
+  }
 
+  for (const initiative of sequence) {
     if (initiative.finalSizeCode) {
+      const capacityStart = capacityGatedStart();
+      let localCursor = capacityStart;
+      let rowStartDays: number | null = null;
       const segments: TimelineSegment[] = [];
       let missingDuration = false;
 
@@ -154,9 +187,12 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
         const key = `${phase.id}::${initiative.finalSizeCode}`;
         const rawDuration = durationByKey.get(key);
         if (rawDuration === undefined) missingDuration = true;
-
         const displayDuration = rawDuration ?? 0;
-        const segmentStartDate = startDate ? addDays(startDate, cursorDays) : null;
+
+        const phaseStart = phase.canOverlap ? localCursor : Math.max(localCursor, resourceFreeAt);
+        if (rowStartDays === null) rowStartDays = phaseStart;
+
+        const segmentStartDate = startDate ? addDays(startDate, phaseStart) : null;
         const durationDays = unitDurationDays(phase.unit, displayDuration, segmentStartDate);
         const segmentEndDate = segmentStartDate ? addDays(segmentStartDate, durationDays) : undefined;
 
@@ -165,15 +201,18 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
           phaseName: phase.name,
           unitName: phase.unit,
           displayDuration,
-          startOffsetWeeks: cursorDays / DAYS_PER_WEEK,
+          startOffsetWeeks: phaseStart / DAYS_PER_WEEK,
           durationWeeks: durationDays / DAYS_PER_WEEK,
           startDate: segmentStartDate ?? undefined,
           endDate: segmentEndDate,
         });
-        cursorDays += durationDays;
+
+        localCursor = phaseStart + durationDays;
+        if (!phase.canOverlap) resourceFreeAt = localCursor;
       }
 
-      const totalDurationDays = cursorDays - rowStartDays;
+      rowStartDays ??= capacityStart;
+      const totalDurationDays = localCursor - rowStartDays;
       rows.push({
         initiativeId: initiative.initiativeId,
         name: initiative.name,
@@ -181,26 +220,35 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
         startOffsetWeeks: rowStartDays / DAYS_PER_WEEK,
         totalDurationWeeks: totalDurationDays / DAYS_PER_WEEK,
         startDate: startDate ? addDays(startDate, rowStartDays) : undefined,
-        endDate: startDate ? addDays(startDate, cursorDays) : undefined,
+        endDate: startDate ? addDays(startDate, localCursor) : undefined,
         segments,
         warning: missingDuration ? 'missing-duration' : undefined,
       });
+
+      minNextStart = rowStartDays;
+      activeEnds.push(localCursor);
+      overallEndDays = Math.max(overallEndDays, localCursor);
     } else if (initiative.timeEstimateWeeks != null) {
+      // No phase data to consult, so treat this as a single non-overlap
+      // block — conservative default, consistent with "unknown means don't
+      // assume it's safe to run alongside anything else."
+      const capacityStart = capacityGatedStart();
+      const rowStartDays = Math.max(capacityStart, resourceFreeAt);
       const durationDays = initiative.timeEstimateWeeks * DAYS_PER_WEEK;
-      const segmentStartDate = startDate ? addDays(startDate, cursorDays) : undefined;
+      const rowEndDays = rowStartDays + durationDays;
+      const segmentStartDate = startDate ? addDays(startDate, rowStartDays) : undefined;
       const segments: TimelineSegment[] = [
         {
           phaseId: null,
           phaseName: 'Estimate',
           unitName: 'week',
           displayDuration: initiative.timeEstimateWeeks,
-          startOffsetWeeks: cursorDays / DAYS_PER_WEEK,
+          startOffsetWeeks: rowStartDays / DAYS_PER_WEEK,
           durationWeeks: initiative.timeEstimateWeeks,
           startDate: segmentStartDate,
           endDate: segmentStartDate ? addDays(segmentStartDate, durationDays) : undefined,
         },
       ];
-      cursorDays += durationDays;
       rows.push({
         initiativeId: initiative.initiativeId,
         name: initiative.name,
@@ -208,9 +256,14 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
         startOffsetWeeks: rowStartDays / DAYS_PER_WEEK,
         totalDurationWeeks: initiative.timeEstimateWeeks,
         startDate: segmentStartDate,
-        endDate: startDate ? addDays(startDate, cursorDays) : undefined,
+        endDate: startDate ? addDays(startDate, rowEndDays) : undefined,
         segments,
       });
+
+      resourceFreeAt = rowEndDays;
+      minNextStart = rowStartDays;
+      activeEnds.push(rowEndDays);
+      overallEndDays = Math.max(overallEndDays, rowEndDays);
     } else {
       // Unresolved: no size, no estimate. Flag it but don't push later
       // initiatives off the schedule for one unsized row.
@@ -218,7 +271,7 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
         initiativeId: initiative.initiativeId,
         name: initiative.name,
         kind: 'unresolved',
-        startOffsetWeeks: cursorDays / DAYS_PER_WEEK,
+        startOffsetWeeks: minNextStart / DAYS_PER_WEEK,
         totalDurationWeeks: 0,
         segments: [],
         warning: 'missing-size',
@@ -228,7 +281,7 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
 
   return {
     rows,
-    totalDurationWeeks: cursorDays / DAYS_PER_WEEK,
-    endDate: startDate ? addDays(startDate, cursorDays) : undefined,
+    totalDurationWeeks: overallEndDays / DAYS_PER_WEEK,
+    endDate: startDate ? addDays(startDate, overallEndDays) : undefined,
   };
 }

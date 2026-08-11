@@ -16,6 +16,7 @@ interface Phase {
   name: string;
   unit: string;
   orderIndex: number;
+  canOverlap: boolean;
   durations: { labelCode: string; durationValue: number }[];
 }
 
@@ -32,7 +33,7 @@ export default function SizingKeyTimelinePreview({ labels, phases }: { labels: L
   const sortedLabels = [...labels].sort((a, b) => a.orderIndex - b.orderIndex);
   const sortedPhases = [...phases]
     .sort((a, b) => a.orderIndex - b.orderIndex)
-    .map((p) => ({ id: p.id, name: p.name, unit: p.unit as PhaseUnit, orderIndex: p.orderIndex }));
+    .map((p) => ({ id: p.id, name: p.name, unit: p.unit as PhaseUnit, orderIndex: p.orderIndex, canOverlap: p.canOverlap }));
   const durations = phases.flatMap((p) => p.durations.map((d) => ({ sizingPhaseId: p.id, labelCode: d.labelCode, durationValue: d.durationValue })));
 
   const rows: TimelineRow[] = sortedLabels.map((label) => {
