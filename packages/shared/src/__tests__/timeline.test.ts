@@ -108,7 +108,7 @@ describe('computeTimeline', () => {
   });
 
   describe('phase overlap and max overlap', () => {
-    it('an overlap-capable first phase lets the next initiative start before the first one finishes', () => {
+    it('shifts the whole block later rather than leaving a gap when a later phase must wait', () => {
       const overlapPhases: TimelinePhaseInput[] = [
         { id: 'discovery', name: 'Discovery', unit: 'week', orderIndex: 0, canOverlap: true },
         { id: 'impl', name: 'Implementation', unit: 'week', orderIndex: 1, canOverlap: false },
@@ -127,14 +127,17 @@ describe('computeTimeline', () => {
         maxOverlap: 2,
       });
 
-      // Second's overlap-capable Discovery starts at week 0 alongside First's,
-      // but Second's non-overlap Implementation waits for First's to finish.
+      // Second's Implementation can't start before week 6 (First's holds the
+      // Implementation resource until then), so Second's whole block —
+      // including its overlap-capable Discovery — is anchored so Discovery
+      // ends exactly where Implementation begins. No gap between them.
       expect(result.rows[0].startOffsetWeeks).toBe(0);
-      expect(result.rows[1].startOffsetWeeks).toBe(0);
-      expect(result.rows[1].segments[1].startOffsetWeeks).toBe(6); // First's Implementation ends at week 6
+      expect(result.rows[1].startOffsetWeeks).toBe(4);
+      expect(result.rows[1].segments[0].startOffsetWeeks).toBe(4); // Discovery
+      expect(result.rows[1].segments[1].startOffsetWeeks).toBe(6); // Implementation
     });
 
-    it('a non-overlap phase still blocks even when maxOverlap is high', () => {
+    it('different-named non-overlap phases are independent resources and do not block each other', () => {
       const result = computeTimeline({
         sequence: [
           { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null },
@@ -145,8 +148,42 @@ describe('computeTimeline', () => {
         maxOverlap: 10,
       });
 
+      // First occupies Discovery/Implementation/Testing weeks 0-8. With
+      // maxOverlap raised, Second is only blocked from starting Discovery
+      // until First's own Discovery frees at week 2 — a different initiative
+      // occupying Implementation or Testing doesn't hold Second back.
       expect(result.rows[0].startOffsetWeeks).toBe(0);
-      expect(result.rows[1].startOffsetWeeks).toBe(8);
+      expect(result.rows[1].startOffsetWeeks).toBe(4);
+      expect(result.rows[1].segments[0].startOffsetWeeks).toBe(4); // Discovery
+      expect(result.rows[1].segments[1].startOffsetWeeks).toBe(6); // Implementation
+      expect(result.rows[1].segments[2].startOffsetWeeks).toBe(10); // Testing
+    });
+
+    it('never leaves a gap between an initiative\'s own consecutive phases', () => {
+      // Regression test: an initiative whose early phase can overlap but
+      // whose later phase is exclusive must not show a gap between them —
+      // the whole block shifts together instead.
+      const overlapPhases: TimelinePhaseInput[] = [
+        { id: 'dev', name: 'Development', unit: 'week', orderIndex: 0, canOverlap: true },
+        { id: 'impl', name: 'Implementation', unit: 'week', orderIndex: 1, canOverlap: false },
+      ];
+      const overlapDurations: TimelineDurationInput[] = [
+        { sizingPhaseId: 'dev', labelCode: 'S', durationValue: 3 },
+        { sizingPhaseId: 'impl', labelCode: 'S', durationValue: 5 },
+      ];
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'blocker', name: 'Blocker', finalSizeCode: 'S', timeEstimateWeeks: null },
+          { initiativeId: 'renewals', name: 'Renewals', finalSizeCode: 'S', timeEstimateWeeks: null },
+        ],
+        phases: overlapPhases,
+        durations: overlapDurations,
+        maxOverlap: 5,
+      });
+
+      const renewals = result.rows[1];
+      const [dev, impl] = renewals.segments;
+      expect(dev.startOffsetWeeks + dev.durationWeeks).toBe(impl.startOffsetWeeks);
     });
 
     it('maxOverlap caps concurrency even when phases are overlap-capable', () => {
