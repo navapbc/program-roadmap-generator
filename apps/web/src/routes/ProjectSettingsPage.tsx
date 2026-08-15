@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { ScaleUnit } from '@roadmap/shared';
 import { trpc } from '../trpc.js';
 import SizeLabelEditor from '../components/sizing/SizeLabelEditor.js';
+import EstimateFieldEditor from '../components/sizing/EstimateFieldEditor.js';
 import MarkerEditor from '../components/sizing/MarkerEditor.js';
 import ScaleToggleList from '../components/timeline/ScaleToggleList.js';
 
@@ -168,6 +169,33 @@ export default function ProjectSettingsPage() {
           an initiative's combined size.
         </p>
         <SizeLabelEditor projectId={data.id} labels={data.sizeLabels} />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-slate-700 mb-2">Estimate fields</h2>
+        <p className="text-xs text-slate-400 mb-2">
+          The columns available when sizing an initiative — e.g. "Policy" and "Implementation" to reproduce the
+          default behavior, or any other set your team wants to track. Each initiative's Final size then combines
+          whichever of these it has values for, per the formula below.
+        </p>
+        <EstimateFieldEditor projectId={data.id} fields={data.estimateFields} />
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-slate-700 mb-2">Final value formula</h2>
+        <p className="text-xs text-slate-400 mb-2">
+          How an initiative's estimate-field values combine into its Final size. Only Max/Min are offered — the size
+          scale above is ordinal (XS/S/M/L/XL), not numeric, so there's no well-defined "sum" or "average" across
+          sizes; max/min always resolve to one of the values actually entered.
+        </p>
+        <select
+          className="border border-slate-300 rounded-md px-3 py-2 text-sm"
+          value={data.finalSizeFormula}
+          onChange={(e) => updateProject.mutate({ id: data.id, finalSizeFormula: e.target.value as 'max' | 'min' })}
+        >
+          <option value="max">Max — the largest value entered</option>
+          <option value="min">Min — the smallest value entered</option>
+        </select>
       </div>
 
       <div>

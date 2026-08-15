@@ -263,7 +263,11 @@ and drop reordering only writes a single row.
 ## Data model
 
 `Project → Milestone → Increment → Initiative`, with `Project.sizeLabels` defining the size codes
-available to initiatives. Each initiative can carry both a policy size and an implementation size.
+available to initiatives. Each project also defines its own `EstimateField`s (e.g. "Policy",
+"Implementation" — any name, any count, configured in Project Settings); an initiative carries one
+`InitiativeEstimateValue` per field it's sized on. `Project.finalSizeFormula` (`max` or `min`)
+decides how those values combine into the initiative's Final size — see `computeFinalSize()` in
+`packages/shared/src/sizing.ts`.
 
 `SizingKey` is a reusable estimation template: `SizingKeyLabel` defines the codes (S/M/L), and
 `SizingPhase` + `SizingDuration` map each code to a duration per phase. A project references one

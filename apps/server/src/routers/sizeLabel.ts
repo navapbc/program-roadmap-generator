@@ -51,14 +51,14 @@ export const sizeLabelRouter = router({
   }),
 
   delete: publicProcedure.input(z.object({ id: idSchema })).mutation(async ({ ctx, input }) => {
-    const referencing = await ctx.prisma.initiative.findMany({
-      where: { OR: [{ policySizeLabelId: input.id }, { implementationSizeLabelId: input.id }] },
-      select: { name: true },
+    const referencing = await ctx.prisma.initiativeEstimateValue.findMany({
+      where: { sizeLabelId: input.id },
+      include: { initiative: { select: { name: true } } },
     });
     if (referencing.length > 0) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: `Can't delete this size — it's used by: ${referencing.map((i) => i.name).join(', ')}.`,
+        message: `Can't delete this size — it's used by: ${referencing.map((r) => r.initiative.name).join(', ')}.`,
       });
     }
 

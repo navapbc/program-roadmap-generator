@@ -58,7 +58,11 @@ export default function TimelinePage() {
     const sequence: TimelineInitiativeInput[] = project.data.milestones.flatMap((m) =>
       m.increments.flatMap((inc) =>
         inc.initiatives.map((init) => {
-          const finalSize = computeFinalSize(project.data!.sizeLabels, init.policySizeLabelId, init.implementationSizeLabelId);
+          const finalSize = computeFinalSize(
+            project.data!.sizeLabels,
+            init.estimateValues.map((v) => v.sizeLabelId),
+            project.data!.finalSizeFormula as 'max' | 'min'
+          );
           return {
             initiativeId: init.id,
             name: init.name,

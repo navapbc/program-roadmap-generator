@@ -9,11 +9,21 @@ interface SizeLabel {
   orderIndex: number;
 }
 
+interface EstimateField {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+
+interface InitiativeEstimateValue {
+  estimateFieldId: string;
+  sizeLabelId: string;
+}
+
 interface Initiative {
   id: string;
   name: string;
-  policySizeLabelId: string | null;
-  implementationSizeLabelId: string | null;
+  estimateValues: InitiativeEstimateValue[];
   timeEstimateWeeks: number | null;
   notes: string | null;
 }
@@ -32,10 +42,14 @@ interface DragHandleProps {
 export default function IncrementBlock({
   increment,
   sizeLabels,
+  estimateFields,
+  finalSizeFormula,
   dragHandleProps,
 }: {
   increment: Increment;
   sizeLabels: SizeLabel[];
+  estimateFields: EstimateField[];
+  finalSizeFormula: 'max' | 'min';
   dragHandleProps?: DragHandleProps;
 }) {
   const utils = trpc.useUtils();
@@ -76,7 +90,14 @@ export default function IncrementBlock({
       <div>
         <SortableContext items={increment.initiatives.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           {increment.initiatives.map((initiative) => (
-            <SortableInitiativeRow key={initiative.id} initiative={initiative} incrementId={increment.id} sizeLabels={sizeLabels} />
+            <SortableInitiativeRow
+              key={initiative.id}
+              initiative={initiative}
+              incrementId={increment.id}
+              sizeLabels={sizeLabels}
+              estimateFields={estimateFields}
+              finalSizeFormula={finalSizeFormula}
+            />
           ))}
         </SortableContext>
         {increment.initiatives.length === 0 && (

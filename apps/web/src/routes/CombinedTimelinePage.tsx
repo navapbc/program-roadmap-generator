@@ -107,7 +107,11 @@ export default function CombinedTimelinePage() {
       const sequence: TimelineInitiativeInput[] = milestones.flatMap((m) =>
         m.increments.flatMap((inc) =>
           inc.initiatives.map((init) => {
-            const finalSize = computeFinalSize(project.sizeLabels, init.policySizeLabelId, init.implementationSizeLabelId);
+            const finalSize = computeFinalSize(
+              project.sizeLabels,
+              init.estimateValues.map((v) => v.sizeLabelId),
+              project.finalSizeFormula as 'max' | 'min'
+            );
             return {
               initiativeId: init.id,
               name: init.name,

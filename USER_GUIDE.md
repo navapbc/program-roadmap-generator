@@ -65,7 +65,10 @@ it. Poking at that is the fastest way to learn. When you are ready to start real
 4. **Build the outline.** Go back to the project and click **+ Add milestone**, then **+ Add
    increment** inside it, then **+ Add initiative** inside that. Rename each by clicking its title
    and typing.
-5. **Size your initiatives.** Use the **Policy** and **Impl.** dropdowns on each initiative row.
+5. **Size your initiatives.** Every new project starts with two estimate fields, **Policy** and
+   **Implementation** — use their dropdowns on each initiative row. (Settings lets you rename, add,
+   remove, or reorder these fields, and choose whether Final takes the Max or Min of whichever
+   fields are set — see [Sizing initiatives](#sizing-initiatives) below.)
 6. **Create a sizing key.** Go to **Sizing Keys**, create one, add the same size labels, add phases
    (such as Discovery / Implementation / Testing), then fill in the duration grid.
 7. **View the timeline.** Return to your project, click **Timeline**, and pick your sizing key.
@@ -137,18 +140,24 @@ Each initiative row offers two mutually exclusive ways to express duration. The 
 
 ### Option 1: sizing (the default)
 
-Two dropdowns, then a computed result:
+One dropdown per estimate field your project defines, then a computed result:
 
-- **Policy** — size of the policy work
-- **Impl.** — size of the implementation work
+- One dropdown per field — a new project starts with **Policy** and **Implementation**, but
+  Project Settings lets you rename, add, remove, or reorder these to whatever columns your team
+  actually wants to track (just "Policy", a single "T-shirt size", or five fields — your call)
 - **Final** — computed, not editable
 
-**Final is the larger of the two**, judged by your size label order. Policy `S` with
-implementation `L` yields `L`. Set only one and that one wins. Set neither and the initiative reads
-**Unsized** in amber.
+**Final combines whichever fields are set**, per your project's formula (Project Settings →
+**Final value formula**): **Max** (the default) takes the largest value entered, **Min** takes the
+smallest — both judged by your size label order. With the default Policy/Implementation setup and
+Max, Policy `S` with Implementation `L` yields `L`. Set only one field and that one wins. Set none
+and the initiative reads **Unsized** in amber.
 
-The reasoning is that policy and implementation work typically overlap rather than queue up, so the
-bigger of the two drives the schedule.
+Only Max/Min are offered because the size scale is ordinal (XS/S/M/L/XL), not numeric — there's no
+well-defined "sum" or "average" across sizes, but max/min always resolve to one of the values
+actually entered. With the default Max formula and the default two fields, the reasoning is that
+policy and implementation work typically overlap rather than queue up, so the bigger of the two
+drives the schedule.
 
 ### Option 2: a direct time estimate
 
@@ -233,6 +242,22 @@ calculation work.
 You **cannot delete a size label that initiatives are using** — the tool names the offending
 initiatives so you can re-tag them first. Renaming a label can break compatibility with a sizing key,
 since matching is by text.
+
+### Estimate fields
+The columns available when sizing an initiative — see [Sizing initiatives](#sizing-initiatives). A
+new project starts with **Policy** and **Implementation**, reproducing the app's original behavior,
+but you can rename, add, remove, and reorder fields freely.
+
+- `←` and `→` reorder a field (display order only — it doesn't affect which value "wins")
+- Click a field's name to rename it
+- `✕` deletes it
+
+Unlike size labels, **deleting a field is not blocked** even if initiatives have values for it —
+removing a field removes its column and every initiative's value for it, the same way deleting a
+spreadsheet column would.
+
+Right below, **Final value formula** picks Max or Min — see
+[Sizing initiatives](#sizing-initiatives) for what each means.
 
 ### Default sizing key
 Pre-selects a key when you open the Timeline. Incompatible keys are disabled here, annotated with
@@ -375,8 +400,12 @@ Left at the defaults, scheduling stays strictly sequential. You can still show s
 milestones) together on the Combined Timeline for teams that don't share a sizing key at all.
 
 **How do I share a roadmap?**
-There is no export yet. Screenshot the timeline, or have colleagues run their own copy. Note that
-their data will be their own; the database does not travel with the code.
+From the project page, **Export CSV**/**Export JSON** download the flattened roadmap (one row per
+initiative, including its estimate-field values and computed Final size); **Export XLSX** builds a
+fuller workbook with that same data plus one tab per compatible sizing key, including a snapshot of
+the Timeline as it renders with that key selected. The CSV/JSON format round-trips: a colleague can
+re-import it via **Import…** on the Programs page into their own copy of the app (always as a new
+project). Note the database itself does not travel with the code — each copy of the app has its own.
 
 **Can I get a deleted item back?**
 No. There is no undo and no version history. Your only recovery is a backup of

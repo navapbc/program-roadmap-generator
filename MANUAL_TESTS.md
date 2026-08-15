@@ -30,19 +30,37 @@ passed once.
 
 ## Sizing an Initiative
 
-- [ ] With at least one size label defined (see Project Settings below), set Policy and
-      Implementation sizes on an Initiative via the two dropdowns.
-- [ ] Confirm **Final** updates live with no explicit save action, and equals
-      `MAX(policy, implementation)` per the project's label order (e.g. Policy=S, Impl=L → Final=L).
-- [ ] Click **Use estimate**; confirm the Policy/Implementation dropdowns are replaced by a single
-      "Time estimate (weeks)" field, and reload to confirm Policy/Implementation were cleared
-      server-side (mutual exclusivity), not just hidden in the UI.
+- [ ] With at least one size label defined (see Project Settings below) and the default Policy/
+      Implementation estimate fields, set both on an Initiative via their dropdowns.
+- [ ] Confirm **Final** updates live with no explicit save action, and equals `MAX(...)` across
+      whichever fields are set, per the project's label order (e.g. Policy=S, Impl=L → Final=L).
+- [ ] In Project Settings, add a third estimate field (e.g. "Design"); confirm a third dropdown
+      appears on every Initiative row immediately, defaulting to unset, and Final is unaffected
+      until you set it.
+- [ ] Set the new field to a size larger than Policy/Implementation; confirm Final updates to
+      match it. Set it back to "—"; confirm Final reverts.
+- [ ] In Project Settings, switch **Final value formula** to **Min**; confirm every Initiative's
+      Final recomputes to the smallest of its set fields (reload to confirm it's not just a
+      client-side artifact). Switch back to **Max**.
+- [ ] Rename an estimate field (e.g. "Policy" → "Requirements"); confirm the dropdown's label
+      updates and existing values are unaffected.
+- [ ] Delete an estimate field that has values set on multiple Initiatives — unlike deleting a size
+      label, this should succeed **without** a blocking/in-use error, removing that column and its
+      values everywhere (reload to confirm).
+- [ ] Try creating (or renaming) an estimate field to a reserved name (`notes`, `project`,
+      `finalSize`, `timeEstimateWeeks`, case-insensitive) — should be rejected.
+- [ ] Click **Use estimate**; confirm every size dropdown is replaced by a single "Time estimate
+      (weeks)" field, and reload to confirm every estimate-field value was cleared server-side
+      (mutual exclusivity), not just hidden in the UI.
 - [ ] Click **Use sizing** to switch back; confirm the estimate was cleared.
-- [ ] Try (via direct API call, not the UI, since the UI never allows it) setting both a size and a
-      time estimate in the same `initiative.update` call — should be rejected with "An initiative
-      can use a size or a time estimate, not both."
-- [ ] Leave an Initiative with neither a size nor an estimate; it should render as "Unsized" (final
-      size column) without breaking anything else.
+- [ ] Try (via direct API call, not the UI, since the UI never allows it) setting both an estimate
+      value and a time estimate in the same `initiative.update` call — should be rejected with "An
+      initiative can use a size or a time estimate, not both."
+- [ ] Leave an Initiative with no estimate-field values and no time estimate; it should render as
+      "Unsized" (final size column) without breaking anything else.
+- [ ] Remove every estimate field from a project (down to zero); confirm Initiative rows show no
+      size dropdowns (still usable via time estimate) and the project page's "no estimate fields
+      yet" banner appears.
 
 ## Drag-and-drop reordering
 
@@ -60,8 +78,8 @@ passed once.
 - [ ] Add a size label (e.g. "XL"); it appears in the ordered list and becomes selectable on
       Initiatives.
 - [ ] Reorder labels with the ← / → controls; confirm the new order affects which size "wins" in
-      the Final-size MAX computation (drag M above L, then Policy=M/Impl=L should now show
-      Final=M).
+      the Final-size computation (drag M above L, then with the Max formula, Policy=M/Impl=L
+      should now show Final=M).
 - [ ] Rename a label; existing Initiatives using it should show the new code.
 - [ ] Try to delete a label that's in use by an Initiative — should be rejected with a message
       listing which Initiative(s) use it.
@@ -264,10 +282,14 @@ passed once.
 - [ ] Import with a new, unused name: confirm a **brand-new** project is created (the file's source
       project, if it still exists, is untouched) and you're navigated to it.
 - [ ] Confirm the imported project's size labels, Milestones/Increments/Initiatives, and
-      Policy/Implementation sizes match the source file, in the same order.
+      estimate-field values match the source file, in the same order.
 - [ ] Import a file where one row has both a size and a time-estimate value: confirm the import
       still succeeds, the initiative keeps its size (not the estimate), and a warning is shown
       listing that initiative by name.
+- [ ] Import a file exported from a project with a **non-default** estimate field set (e.g. a
+      single "T-shirt size" field, or three fields): confirm the imported project gets exactly
+      those estimate fields (discovered from the file's own column headers), in the order they
+      first appear — not the default Policy/Implementation pair.
 - [ ] Try a malformed file (e.g. missing a required column, or invalid JSON): confirm a clear error
       is shown instead of a crash, and the file input can be retried.
 
@@ -281,8 +303,9 @@ passed once.
 ## Exports
 
 - [ ] **Roadmap CSV** (project page → Export CSV): downloads a CSV with columns `project, milestone,
-      increment, initiative, policySize, implementationSize, finalSize, timeEstimateWeeks, notes`;
-      spot-check a few rows against what's shown on screen.
+      increment, initiative`, then one column per the project's own configured estimate fields (by
+      name, in their configured order — e.g. `Policy, Implementation` by default), then `finalSize,
+      timeEstimateWeeks, notes`; spot-check a few rows against what's shown on screen.
 - [ ] **Roadmap JSON** (project page → Export JSON): downloads the same data as a JSON array.
 - [ ] **Timeline CSV** (Timeline page → Export CSV): downloads one row per phase segment with
       `project, milestone, increment, initiative, phase, startDate, endDate`; confirm dates are real

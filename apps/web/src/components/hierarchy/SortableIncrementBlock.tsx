@@ -8,11 +8,21 @@ interface SizeLabel {
   orderIndex: number;
 }
 
+interface EstimateField {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+
+interface InitiativeEstimateValue {
+  estimateFieldId: string;
+  sizeLabelId: string;
+}
+
 interface Initiative {
   id: string;
   name: string;
-  policySizeLabelId: string | null;
-  implementationSizeLabelId: string | null;
+  estimateValues: InitiativeEstimateValue[];
   timeEstimateWeeks: number | null;
   notes: string | null;
 }
@@ -23,7 +33,17 @@ interface Increment {
   initiatives: Initiative[];
 }
 
-export default function SortableIncrementBlock({ increment, sizeLabels }: { increment: Increment; sizeLabels: SizeLabel[] }) {
+export default function SortableIncrementBlock({
+  increment,
+  sizeLabels,
+  estimateFields,
+  finalSizeFormula,
+}: {
+  increment: Increment;
+  sizeLabels: SizeLabel[];
+  estimateFields: EstimateField[];
+  finalSizeFormula: 'max' | 'min';
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: increment.id,
     data: { type: 'increment' },
@@ -34,7 +54,13 @@ export default function SortableIncrementBlock({ increment, sizeLabels }: { incr
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }}
     >
-      <IncrementBlock increment={increment} sizeLabels={sizeLabels} dragHandleProps={{ attributes, listeners }} />
+      <IncrementBlock
+        increment={increment}
+        sizeLabels={sizeLabels}
+        estimateFields={estimateFields}
+        finalSizeFormula={finalSizeFormula}
+        dragHandleProps={{ attributes, listeners }}
+      />
     </div>
   );
 }

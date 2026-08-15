@@ -1,14 +1,13 @@
 import { fromCSV } from './csv.js';
 
-export interface ImportRow {
+/** One row per initiative. The fixed fields are named explicitly; anything else is one project-defined estimate field's value, keyed by its column header — there's no fixed list of them, unlike the old Policy/Implementation pair. */
+export type ImportRow = {
   milestone: string;
   increment: string;
   initiative: string;
-  policySize: string;
-  implementationSize: string;
-  timeEstimateWeeks: string;
-  notes: string;
-}
+  notes?: string;
+  timeEstimateWeeks?: string;
+} & Record<string, string | undefined>;
 
 export interface ParsedRoadmap {
   /** The project name found in the file — always uniform across every row, since an export always comes from one project. */
@@ -18,23 +17,20 @@ export interface ParsedRoadmap {
 
 const REQUIRED_FIELDS = ['project', 'milestone', 'increment', 'initiative'] as const;
 
-function normalizeRow(raw: Record<string, unknown>, rowNumber: number): ImportRow & { project: string } {
+function normalizeRow(raw: Record<string, unknown>, rowNumber: number): ImportRow {
   const get = (key: string) => (raw[key] == null ? '' : String(raw[key]));
   for (const field of REQUIRED_FIELDS) {
     if (!get(field).trim()) {
       throw new Error(`Row ${rowNumber} is missing "${field}".`);
     }
   }
-  return {
-    project: get('project').trim(),
-    milestone: get('milestone').trim(),
-    increment: get('increment').trim(),
-    initiative: get('initiative').trim(),
-    policySize: get('policySize').trim(),
-    implementationSize: get('implementationSize').trim(),
-    timeEstimateWeeks: get('timeEstimateWeeks').trim(),
-    notes: get('notes'),
-  };
+  const row: Record<string, string> = {};
+  for (const key of Object.keys(raw)) {
+    row[key] = get(key).trim();
+  }
+  row.notes = get('notes');
+  // Required fields' presence was just checked above, so this cast is safe.
+  return row as ImportRow;
 }
 
 /** Parses a roadmap CSV or JSON file (as produced by this app's own roadmap export) back into import-ready rows. */
@@ -54,7 +50,9 @@ export function parseRoadmapFile(filename: string, text: string): ParsedRoadmap 
   }
 
   const normalized = raw.map((r, i) => normalizeRow(r as Record<string, unknown>, i + 1));
-  const distinctNames = [...new Set(normalized.map((r) => r.project))];
+  // 'project' is one of REQUIRED_FIELDS, so normalizeRow already guarantees
+  // every row has a non-empty value for it — safe to assert away `undefined`.
+  const distinctNames = [...new Set(normalized.map((r) => r.project!))];
   if (distinctNames.length > 1) {
     throw new Error(`This file contains more than one project (${distinctNames.join(', ')}) — import one project's export at a time.`);
   }

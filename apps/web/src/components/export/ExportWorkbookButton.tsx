@@ -9,11 +9,19 @@ interface SizeLabel {
   code: string;
   orderIndex: number;
 }
+interface EstimateField {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+interface InitiativeEstimateValue {
+  estimateFieldId: string;
+  sizeLabelId: string;
+}
 interface Initiative {
   id: string;
   name: string;
-  policySizeLabelId: string | null;
-  implementationSizeLabelId: string | null;
+  estimateValues: InitiativeEstimateValue[];
   timeEstimateWeeks: number | null;
   notes: string | null;
 }
@@ -31,6 +39,8 @@ interface ProjectData {
   id: string;
   name: string;
   sizeLabels: SizeLabel[];
+  estimateFields: EstimateField[];
+  finalSizeFormula: string;
   milestones: Milestone[];
   startDate: string | Date | null;
   timelineHeaderScales: string[];

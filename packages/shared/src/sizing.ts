@@ -1,22 +1,34 @@
 import type { SizeLabelInput } from './types.js';
 
+export type FinalSizeFormula = 'max' | 'min';
+
 /**
- * Combined/Final size = MAX(policy, implementation) using the Project's own
- * label ordering. Never persisted — always recomputed on read.
+ * Combined/Final size = MAX or MIN (per the project's configured formula) of
+ * however many estimate-field values are set, using the Project's own label
+ * ordering. Never persisted — always recomputed on read.
+ *
+ * Only max/min are offered: a project's size scale is ordinal (XS/S/M/L/XL),
+ * not numeric, so arithmetic combinations like sum/average have no
+ * well-defined meaning across sizes — max/min are the only combinators that
+ * always resolve to one of the actual values entered, with no invented
+ * in-between size.
  */
 export function computeFinalSize(
   projectLabels: SizeLabelInput[],
-  policyLabelId: string | null | undefined,
-  implementationLabelId: string | null | undefined
+  valueLabelIds: (string | null | undefined)[],
+  formula: FinalSizeFormula = 'max'
 ): SizeLabelInput | null {
   const byId = new Map(projectLabels.map((l) => [l.id, l]));
-  const policy = policyLabelId ? byId.get(policyLabelId) ?? null : null;
-  const impl = implementationLabelId ? byId.get(implementationLabelId) ?? null : null;
+  const resolved = valueLabelIds
+    .map((id) => (id ? byId.get(id) ?? null : null))
+    .filter((label): label is SizeLabelInput => label != null);
 
-  if (policy && impl) {
-    return policy.orderIndex >= impl.orderIndex ? policy : impl;
-  }
-  return policy ?? impl ?? null;
+  if (resolved.length === 0) return null;
+  return resolved.reduce((winner, candidate) =>
+    formula === 'min'
+      ? (candidate.orderIndex < winner.orderIndex ? candidate : winner)
+      : (candidate.orderIndex > winner.orderIndex ? candidate : winner)
+  );
 }
 
 export interface SizingKeyCompatibilityResult {

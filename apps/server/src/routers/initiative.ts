@@ -15,9 +15,9 @@ export const initiativeRouter = router({
   }),
 
   update: publicProcedure.input(updateInitiativeSchema).mutation(async ({ ctx, input }) => {
-    const { id, policySizeLabelId, implementationSizeLabelId, timeEstimateWeeks, ...rest } = input;
+    const { id, estimateValues, timeEstimateWeeks, ...rest } = input;
 
-    const settingSize = policySizeLabelId != null || implementationSizeLabelId != null;
+    const settingSize = estimateValues?.some((v) => v.sizeLabelId != null) ?? false;
     const settingEstimate = timeEstimateWeeks != null;
 
     if (settingSize || settingEstimate) {
@@ -27,36 +27,51 @@ export const initiativeRouter = router({
       });
       const projectId = initiative.increment.milestone.projectId;
 
-      if (settingSize) {
-        // Policy and implementation are often set to the same label — dedupe
-        // before comparing counts, since findMany naturally returns one row
-        // per matching id regardless of how many times it appears in `in`.
-        const idsToCheck = [...new Set([policySizeLabelId, implementationSizeLabelId].filter((x): x is string => x != null))];
-        const labels = await ctx.prisma.sizeLabel.findMany({ where: { id: { in: idsToCheck } } });
-        const foreign = labels.filter((l) => l.projectId !== projectId);
-        if (foreign.length > 0 || labels.length !== idsToCheck.length) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: "That size doesn't belong to this initiative's project." });
+      if (settingSize && estimateValues) {
+        const labelIds = [...new Set(estimateValues.map((v) => v.sizeLabelId).filter((x): x is string => x != null))];
+        const fieldIds = [...new Set(estimateValues.map((v) => v.estimateFieldId))];
+        const [labels, fields] = await Promise.all([
+          ctx.prisma.sizeLabel.findMany({ where: { id: { in: labelIds } } }),
+          ctx.prisma.estimateField.findMany({ where: { id: { in: fieldIds } } }),
+        ]);
+        const foreignLabel = labels.some((l) => l.projectId !== projectId) || labels.length !== labelIds.length;
+        const foreignField = fields.some((f) => f.projectId !== projectId) || fields.length !== fieldIds.length;
+        if (foreignLabel || foreignField) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: "That size or estimate field doesn't belong to this initiative's project." });
         }
       }
     }
 
     const data: Record<string, unknown> = { ...rest };
-    if (policySizeLabelId !== undefined) data.policySizeLabelId = policySizeLabelId;
-    if (implementationSizeLabelId !== undefined) data.implementationSizeLabelId = implementationSizeLabelId;
     if (timeEstimateWeeks !== undefined) data.timeEstimateWeeks = timeEstimateWeeks;
-
     // Mutual exclusivity holds regardless of what the previous row state
     // was — setting one group always clears the other, since fields not
     // present in this call are otherwise left untouched (PATCH semantics).
-    if (settingSize) {
-      data.timeEstimateWeeks = null;
-    }
-    if (settingEstimate) {
-      data.policySizeLabelId = null;
-      data.implementationSizeLabelId = null;
-    }
+    if (settingSize) data.timeEstimateWeeks = null;
 
-    return ctx.prisma.initiative.update({ where: { id }, data });
+    await ctx.prisma.$transaction(async (tx) => {
+      if (Object.keys(data).length > 0) {
+        await tx.initiative.update({ where: { id }, data });
+      }
+      if (settingEstimate) {
+        await tx.initiativeEstimateValue.deleteMany({ where: { initiativeId: id } });
+      }
+      if (estimateValues) {
+        for (const v of estimateValues) {
+          if (v.sizeLabelId == null) {
+            await tx.initiativeEstimateValue.deleteMany({ where: { initiativeId: id, estimateFieldId: v.estimateFieldId } });
+          } else {
+            await tx.initiativeEstimateValue.upsert({
+              where: { initiativeId_estimateFieldId: { initiativeId: id, estimateFieldId: v.estimateFieldId } },
+              create: { initiativeId: id, estimateFieldId: v.estimateFieldId, sizeLabelId: v.sizeLabelId },
+              update: { sizeLabelId: v.sizeLabelId },
+            });
+          }
+        }
+      }
+    });
+
+    return ctx.prisma.initiative.findUniqueOrThrow({ where: { id }, include: { estimateValues: true } });
   }),
 
   reorder: publicProcedure.input(reorderSchema).mutation(async ({ ctx, input }) => {
