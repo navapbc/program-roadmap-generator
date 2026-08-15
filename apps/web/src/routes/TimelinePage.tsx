@@ -5,6 +5,7 @@ import {
   computeFinalSize,
   computeTimeline,
   dateRangeToWindow,
+  isUsabilityCheckpointInitiative,
   type PhaseUnit,
   type ScaleUnit,
   type TimelineInitiativeInput,
@@ -63,6 +64,10 @@ export default function TimelinePage() {
             name: init.name,
             finalSizeCode: finalSize?.code ?? null,
             timeEstimateWeeks: init.timeEstimateWeeks,
+            incrementId: inc.id,
+            isUsabilityCheckpoint: selectedKey.data!.usabilityGateEnabled
+              ? isUsabilityCheckpointInitiative(init.name, init.timeEstimateWeeks)
+              : false,
           };
         })
       )

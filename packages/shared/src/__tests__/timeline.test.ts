@@ -207,6 +207,94 @@ describe('computeTimeline', () => {
     });
   });
 
+  describe('usability gate (isUsabilityCheckpoint / incrementId)', () => {
+    // Discovery(2) + Implementation(4) + Testing(2) per S, same as the
+    // top-level `phases`/`durations` fixtures, all overlap-capable so
+    // multiple initiatives can be in flight while we isolate the gate rules.
+    const gatePhases: TimelinePhaseInput[] = [
+      { id: 'discovery', name: 'Discovery', unit: 'week', orderIndex: 0, canOverlap: true },
+      { id: 'impl', name: 'Implementation', unit: 'week', orderIndex: 1, canOverlap: true },
+      { id: 'testing', name: 'Testing', unit: 'week', orderIndex: 2, canOverlap: true },
+    ];
+
+    it("delays a checkpoint until every earlier same-increment initiative's Implementation is 50% complete", () => {
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null, incrementId: 'inc1' },
+          { initiativeId: 'gate', name: 'Usability Testing', finalSizeCode: null, timeEstimateWeeks: 3, incrementId: 'inc1', isUsabilityCheckpoint: true },
+        ],
+        phases: gatePhases,
+        durations,
+        maxOverlap: 5,
+      });
+
+      // i1: Discovery 0-2, Implementation 2-6, Testing 6-8. 50% of
+      // Implementation (4 weeks) complete = day (2+2)=4 weeks in.
+      expect(result.rows[1].startOffsetWeeks).toBe(4);
+    });
+
+    it('does not gate a non-checkpoint flat-estimate initiative even when the name matches loosely', () => {
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null, incrementId: 'inc1' },
+          { initiativeId: 'plain', name: 'Usability Testing', finalSizeCode: null, timeEstimateWeeks: 3, incrementId: 'inc1' },
+        ],
+        phases: gatePhases,
+        durations,
+        maxOverlap: 5,
+      });
+
+      // isUsabilityCheckpoint left unset — starts as soon as capacity allows.
+      expect(result.rows[1].startOffsetWeeks).toBe(0);
+    });
+
+    it('ignores preceding initiatives from a different increment', () => {
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null, incrementId: 'inc1' },
+          { initiativeId: 'gate', name: 'Usability Testing', finalSizeCode: null, timeEstimateWeeks: 3, incrementId: 'inc2', isUsabilityCheckpoint: true },
+        ],
+        phases: gatePhases,
+        durations,
+        maxOverlap: 5,
+      });
+
+      expect(result.rows[1].startOffsetWeeks).toBe(0);
+    });
+
+    it("caps a later initiative's Discovery overlap with a prior checkpoint at half its own duration", () => {
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'gate', name: 'Usability Testing', finalSizeCode: null, timeEstimateWeeks: 4, incrementId: 'inc1', isUsabilityCheckpoint: true },
+          { initiativeId: 'next', name: 'Second', finalSizeCode: 'S', timeEstimateWeeks: null, incrementId: 'inc1' },
+        ],
+        phases: gatePhases,
+        durations,
+        maxOverlap: 5,
+      });
+
+      // Checkpoint spans [0, 4). Second's Discovery is 2 weeks long, so at
+      // most 1 week may overlap the checkpoint — Discovery must start no
+      // earlier than week 3 (checkpoint end 4 − half of 2).
+      expect(result.rows[1].segments[0].startOffsetWeeks).toBe(3);
+    });
+
+    it('is fully inert when no row sets isUsabilityCheckpoint (existing sizing keys unaffected)', () => {
+      const result = computeTimeline({
+        sequence: [
+          { initiativeId: 'i1', name: 'First', finalSizeCode: 'S', timeEstimateWeeks: null },
+          { initiativeId: 'i2', name: 'Second', finalSizeCode: 'S', timeEstimateWeeks: null },
+        ],
+        phases: gatePhases,
+        durations,
+        maxOverlap: 5,
+      });
+
+      expect(result.rows[0].startOffsetWeeks).toBe(0);
+      expect(result.rows[1].startOffsetWeeks).toBe(0);
+    });
+  });
+
   describe('month-unit phases use real calendar lengths, not an average', () => {
     const monthPhases: TimelinePhaseInput[] = [{ id: 'build', name: 'Build', unit: 'month', orderIndex: 0, canOverlap: false }];
     const monthDurations: TimelineDurationInput[] = [{ sizingPhaseId: 'build', labelCode: 'M', durationValue: 1 }];

@@ -103,6 +103,11 @@ export const updateSizingKeySchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   maxOverlap: z.number().int().min(1).optional(),
+  // When true, timeline.compute gates any flat-estimate initiative named
+  // "Usability Testing" on 50% completion of preceding same-increment
+  // initiatives' Implementation phase, and caps how much a later
+  // initiative's Discovery phase may overlap it — see computeTimeline().
+  usabilityGateEnabled: z.boolean().optional(),
 });
 
 export const duplicateSizingKeySchema = z.object({

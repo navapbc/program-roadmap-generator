@@ -8,6 +8,27 @@ export interface TimelineInitiativeInput {
   name: string;
   finalSizeCode: string | null;
   timeEstimateWeeks: number | null;
+  // Increment membership, used only by the usability-gate rules below. Falls
+  // back to this initiative's own id when omitted, which guarantees it never
+  // matches another row — existing callers that don't supply it (and every
+  // pre-gate test) get exactly the old ungated behavior.
+  incrementId?: string;
+  // Marks this row as a "usability testing round" checkpoint rather than a
+  // regular flat-estimate initiative — see isUsabilityCheckpointInitiative().
+  isUsabilityCheckpoint?: boolean;
+}
+
+const USABILITY_CHECKPOINT_NAME = /usability testing/i;
+
+/**
+ * The two "usability gate" scheduling rules in computeTimeline() only ever
+ * apply to unsized, flat-estimate initiatives named "Usability Testing" (the
+ * one naming convention the source estimation workbook uses throughout) — so
+ * callers derive this by name/estimate rather than a dedicated Initiative
+ * field, and only when the active sizing key opts in (SizingKey.usabilityGateEnabled).
+ */
+export function isUsabilityCheckpointInitiative(name: string, timeEstimateWeeks: number | null): boolean {
+  return timeEstimateWeeks != null && USABILITY_CHECKPOINT_NAME.test(name);
 }
 
 export interface TimelinePhaseInput {
@@ -208,6 +229,19 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
   let overallEndDays = 0;
   const rows: TimelineRow[] = [];
 
+  // "Usability gate" bookkeeping — inert unless a row sets isUsabilityCheckpoint.
+  // Per increment, the day each already-scheduled sized initiative's
+  // Implementation phase reaches 50% complete (implStart + 0.5*implDuration).
+  // A checkpoint initiative can't start before every one of these, for
+  // whichever earlier initiatives share its increment.
+  const halfImplMarksByIncrement = new Map<string, number[]>();
+  // Booked spans of already-scheduled checkpoint initiatives. A later sized
+  // initiative's Discovery-named phase may not overlap any of these by more
+  // than half its own duration.
+  const checkpointIntervals: DayInterval[] = [];
+  const incrementKeyOf = (initiative: TimelineInitiativeInput) => initiative.incrementId ?? initiative.initiativeId;
+  const isPhaseNamed = (phase: TimelinePhaseInput, target: string) => phase.name.trim().toLowerCase() === target;
+
   // Earliest day >= minNextStart at which fewer than maxOverlap
   // already-scheduled initiatives are still active.
   function capacityGatedStart(): number {
@@ -248,12 +282,30 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
       const attempt = computeSegmentsAt(initiative, blockStart);
       let bump = blockStart;
       for (const seg of attempt.segments) {
-        if (seg.phase.canOverlap || seg.durationDays <= 0) continue;
-        const busy = resourceBusyByPhase.get(seg.phase.id) ?? [];
-        const conflictEnd = latestConflictEnd([...busy, ...globalBusy], seg.startDays, seg.startDays + seg.durationDays);
-        if (conflictEnd !== null) {
-          const requiredStart = blockStart + (conflictEnd - seg.startDays);
-          if (requiredStart > bump) bump = requiredStart;
+        if (seg.durationDays <= 0) continue;
+
+        if (!seg.phase.canOverlap) {
+          const busy = resourceBusyByPhase.get(seg.phase.id) ?? [];
+          const conflictEnd = latestConflictEnd([...busy, ...globalBusy], seg.startDays, seg.startDays + seg.durationDays);
+          if (conflictEnd !== null) {
+            const requiredStart = blockStart + (conflictEnd - seg.startDays);
+            if (requiredStart > bump) bump = requiredStart;
+          }
+        }
+
+        // Usability gate, rule 2: this initiative's Discovery may not overlap
+        // a preceding checkpoint's span by more than half its own duration.
+        if (checkpointIntervals.length > 0 && isPhaseNamed(seg.phase, 'discovery')) {
+          const maxAllowedOverlap = 0.5 * seg.durationDays;
+          for (const civ of checkpointIntervals) {
+            const overlapDays =
+              Math.min(seg.startDays + seg.durationDays, civ.end) - Math.max(seg.startDays, civ.start);
+            if (overlapDays > maxAllowedOverlap) {
+              const requiredSegStart = civ.end - maxAllowedOverlap;
+              const requiredStart = blockStart + (requiredSegStart - seg.startDays);
+              if (requiredStart > bump) bump = requiredStart;
+            }
+          }
         }
       }
       if (bump === blockStart) return attempt;
@@ -300,6 +352,17 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
       minNextStart = rowStartDays;
       activeEnds.push(cursor);
       overallEndDays = Math.max(overallEndDays, cursor);
+
+      // Usability gate, rule 1's bookkeeping: record where this initiative's
+      // Implementation phase reaches 50% complete, so a later checkpoint in
+      // the same increment can gate its own start on it.
+      const implSeg = pending.find((seg) => isPhaseNamed(seg.phase, 'implementation') && seg.durationDays > 0);
+      if (implSeg) {
+        const key = incrementKeyOf(initiative);
+        const marks = halfImplMarksByIncrement.get(key) ?? [];
+        marks.push(implSeg.startDays + 0.5 * implSeg.durationDays);
+        halfImplMarksByIncrement.set(key, marks);
+      }
     } else if (initiative.timeEstimateWeeks != null) {
       // No phase data to consult, so treat this as a single block checked
       // against every non-overlap phase's resource — conservative default,
@@ -307,7 +370,14 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
       // alongside anything else."
       const capacityStart = capacityGatedStart();
       const durationDays = initiative.timeEstimateWeeks * DAYS_PER_WEEK;
-      let rowStartDays = capacityStart;
+
+      // Usability gate, rule 1: a checkpoint can't start before every earlier
+      // same-increment initiative's Implementation phase is half done.
+      const gateFloor = initiative.isUsabilityCheckpoint
+        ? Math.max(0, ...(halfImplMarksByIncrement.get(incrementKeyOf(initiative)) ?? [0]))
+        : 0;
+
+      let rowStartDays = Math.max(capacityStart, gateFloor);
       for (;;) {
         const allBusy = [...Array.from(resourceBusyByPhase.values()).flat(), ...globalBusy];
         const conflictEnd = latestConflictEnd(allBusy, rowStartDays, rowStartDays + durationDays);
@@ -316,6 +386,9 @@ export function computeTimeline(input: TimelineInput): TimelineResult {
       }
       const rowEndDays = rowStartDays + durationDays;
       globalBusy.push({ start: rowStartDays, end: rowEndDays });
+      if (initiative.isUsabilityCheckpoint) {
+        checkpointIntervals.push({ start: rowStartDays, end: rowEndDays });
+      }
 
       const segmentStartDate = startDate ? addDays(startDate, rowStartDays) : undefined;
       const segments: TimelineSegment[] = [
