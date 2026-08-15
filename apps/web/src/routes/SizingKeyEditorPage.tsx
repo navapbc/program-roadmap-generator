@@ -47,6 +47,22 @@ export default function SizingKeyEditorPage() {
           />
           <span className="text-xs text-slate-400">Max initiatives active at once, regardless of phase.</span>
         </label>
+        <label className="flex items-start gap-2 text-sm text-slate-600 mt-2">
+          <input
+            className="mt-0.5"
+            type="checkbox"
+            checked={data.usabilityGateEnabled}
+            onChange={(e) => update.mutate({ id: data.id, usabilityGateEnabled: e.target.checked })}
+          />
+          <span>
+            Gate Usability Testing on 50% completion
+            <span className="block text-xs text-slate-400">
+              A flat-estimate initiative named "Usability Testing" can't start until every earlier initiative in its
+              increment is at least half through its Implementation phase — and a later initiative's Discovery phase
+              can overlap it by at most half its own duration.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div>

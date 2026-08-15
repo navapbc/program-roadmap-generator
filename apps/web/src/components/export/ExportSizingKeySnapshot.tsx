@@ -3,6 +3,7 @@ import {
   buildMilestoneBoundaries,
   computeFinalSize,
   computeTimeline,
+  isUsabilityCheckpointInitiative,
   type PhaseUnit,
   type ScaleUnit,
   type TimelineInitiativeInput,
@@ -86,6 +87,10 @@ export default function ExportSizingKeySnapshot({
             name: init.name,
             finalSizeCode: finalSize?.code ?? null,
             timeEstimateWeeks: init.timeEstimateWeeks,
+            incrementId: inc.id,
+            isUsabilityCheckpoint: key.data!.usabilityGateEnabled
+              ? isUsabilityCheckpointInitiative(init.name, init.timeEstimateWeeks)
+              : false,
           };
         })
       )

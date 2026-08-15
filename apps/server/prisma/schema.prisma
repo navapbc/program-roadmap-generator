@@ -119,6 +119,13 @@ model SizingKey {
   // lock in computeTimeline() dominates this cap and the schedule stays
   // fully sequential until a phase is explicitly marked overlap-capable.
   maxOverlap  Int      @default(2)
+  // Opts a key into the "usability gate" scheduling rules in computeTimeline():
+  // a flat-estimate initiative named "Usability Testing" can't start until
+  // preceding same-increment initiatives' Implementation phase is 50% done,
+  // and a later initiative's Discovery phase may overlap it by at most half
+  // its own duration. Off by default — every key built from this scenario's
+  // own spreadsheet tab uses the simpler canOverlap/maxOverlap rules only.
+  usabilityGateEnabled Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

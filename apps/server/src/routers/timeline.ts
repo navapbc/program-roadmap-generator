@@ -3,6 +3,7 @@ import {
   computeFinalSize,
   computeTimeline,
   computeTimelineInputSchema,
+  isUsabilityCheckpointInitiative,
   type PhaseUnit,
   type TimelineDurationInput,
   type TimelineInitiativeInput,
@@ -62,6 +63,10 @@ export const timelineRouter = router({
             name: initiative.name,
             finalSizeCode: finalSize?.code ?? null,
             timeEstimateWeeks: initiative.timeEstimateWeeks,
+            incrementId: increment.id,
+            isUsabilityCheckpoint: sizingKey.usabilityGateEnabled
+              ? isUsabilityCheckpointInitiative(initiative.name, initiative.timeEstimateWeeks)
+              : false,
           };
         })
       )

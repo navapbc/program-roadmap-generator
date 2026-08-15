@@ -63,6 +63,7 @@ export const sizingKeyRouter = router({
         name: input.newName,
         description: source.description,
         maxOverlap: source.maxOverlap,
+        usabilityGateEnabled: source.usabilityGateEnabled,
         labels: { create: source.labels.map((l) => ({ code: l.code, orderIndex: l.orderIndex })) },
         phases: {
           create: source.phases.map((p) => ({
