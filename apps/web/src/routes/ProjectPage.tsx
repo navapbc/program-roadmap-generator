@@ -3,7 +3,7 @@ import { trpc } from '../trpc.js';
 import MilestoneColumn from '../components/hierarchy/MilestoneColumn.js';
 import { toCSV } from '../lib/csv.js';
 import { downloadText } from '../lib/download.js';
-import { buildRoadmapRows, ROADMAP_COLUMNS } from '../lib/roadmapExport.js';
+import { buildRoadmapColumns, buildRoadmapRows } from '../lib/roadmapExport.js';
 import ExportWorkbookButton from '../components/export/ExportWorkbookButton.js';
 
 export default function ProjectPage() {
@@ -19,7 +19,7 @@ export default function ProjectPage() {
 
   function exportCSV() {
     const rows = buildRoadmapRows(data);
-    downloadText(`${data.name}-roadmap.csv`, 'text/csv', toCSV(rows, ROADMAP_COLUMNS));
+    downloadText(`${data.name}-roadmap.csv`, 'text/csv', toCSV(rows, buildRoadmapColumns(data)));
   }
 
   function exportJSON() {
@@ -61,8 +61,25 @@ export default function ProjectPage() {
         </div>
       )}
 
+      {data.estimateFields.length === 0 && (
+        <div className="mb-4 px-4 py-3 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          This project has no estimate fields yet.{' '}
+          <Link to={`/projects/${data.id}/settings`} className="underline">
+            Define them in Settings
+          </Link>{' '}
+          before sizing initiatives (or use a time estimate instead).
+        </div>
+      )}
+
       {data.milestones.map((milestone) => (
-        <MilestoneColumn key={milestone.id} milestone={milestone} sizeLabels={data.sizeLabels} projectId={data.id} />
+        <MilestoneColumn
+          key={milestone.id}
+          milestone={milestone}
+          sizeLabels={data.sizeLabels}
+          estimateFields={data.estimateFields}
+          finalSizeFormula={data.finalSizeFormula as 'max' | 'min'}
+          projectId={data.id}
+        />
       ))}
 
       <button

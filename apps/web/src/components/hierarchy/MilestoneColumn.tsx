@@ -12,12 +12,22 @@ interface SizeLabel {
   orderIndex: number;
 }
 
+interface EstimateField {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+
+interface InitiativeEstimateValue {
+  estimateFieldId: string;
+  sizeLabelId: string;
+}
+
 interface Initiative {
   id: string;
   name: string;
   orderKey: string;
-  policySizeLabelId: string | null;
-  implementationSizeLabelId: string | null;
+  estimateValues: InitiativeEstimateValue[];
   timeEstimateWeeks: number | null;
   notes: string | null;
 }
@@ -38,10 +48,14 @@ interface Milestone {
 export default function MilestoneColumn({
   milestone,
   sizeLabels,
+  estimateFields,
+  finalSizeFormula,
   projectId,
 }: {
   milestone: Milestone;
   sizeLabels: SizeLabel[];
+  estimateFields: EstimateField[];
+  finalSizeFormula: 'max' | 'min';
   projectId: string;
 }) {
   const utils = trpc.useUtils();
@@ -107,7 +121,13 @@ export default function MilestoneColumn({
         <SortableContext items={milestone.increments.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-3">
             {milestone.increments.map((increment) => (
-              <SortableIncrementBlock key={increment.id} increment={increment} sizeLabels={sizeLabels} />
+              <SortableIncrementBlock
+                key={increment.id}
+                increment={increment}
+                sizeLabels={sizeLabels}
+                estimateFields={estimateFields}
+                finalSizeFormula={finalSizeFormula}
+              />
             ))}
           </div>
         </SortableContext>

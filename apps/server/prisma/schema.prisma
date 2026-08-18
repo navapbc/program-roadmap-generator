@@ -20,11 +20,19 @@ model Project {
   // 0=Sunday..6=Saturday, matching Date#getUTCDay().
   sprintLengthBusinessDays Int?
   sprintStartWeekday       Int?
+  // How an initiative's per-field estimate values combine into its Final
+  // size — 'max' or 'min' by the project's own SizeLabel order. Plain string
+  // + app-level Zod validation rather than a Prisma enum, same convention as
+  // SizingPhase.unit. Only these two make unambiguous sense for an ordinal
+  // (non-numeric) size scale — arithmetic ones like sum/average have no
+  // well-defined meaning across T-shirt sizes.
+  finalSizeFormula        String    @default("max")
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
   defaultSizingKey   SizingKey?          @relation(fields: [defaultSizingKeyId], references: [id], onDelete: SetNull)
   sizeLabels         SizeLabel[]
+  estimateFields     EstimateField[]
   milestones         Milestone[]
   markers            TimelineMarker[]
   combinedViewScopes CombinedViewScope[]
@@ -50,12 +58,45 @@ model SizeLabel {
   code       String
   orderIndex Int
 
-  project                     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  initiativesAsPolicy         Initiative[] @relation("InitiativePolicySize")
-  initiativesAsImplementation Initiative[] @relation("InitiativeImplementationSize")
+  project        Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  estimateValues InitiativeEstimateValue[]
 
   @@unique([projectId, code])
   @@unique([projectId, orderIndex])
+}
+
+/// One configurable "column" for sizing an initiative (e.g. "Policy",
+/// "Implementation") — a project can define as many of these as it wants.
+/// Order matters only for display; which value "wins" as Final is decided by
+/// Project.finalSizeFormula, not by field order.
+model EstimateField {
+  id         String @id @default(cuid())
+  projectId  String
+  name       String
+  orderIndex Int
+
+  project Project                   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  values  InitiativeEstimateValue[]
+
+  @@unique([projectId, name])
+  @@unique([projectId, orderIndex])
+}
+
+/// One initiative's chosen size for one estimate field. Absence of a row
+/// means that field is unset for that initiative (mirrors the old nullable
+/// policySizeLabelId/implementationSizeLabelId FKs, generalized to N fields).
+model InitiativeEstimateValue {
+  id              String @id @default(cuid())
+  initiativeId    String
+  estimateFieldId String
+  sizeLabelId     String
+
+  initiative    Initiative    @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  estimateField EstimateField @relation(fields: [estimateFieldId], references: [id], onDelete: Cascade)
+  sizeLabel     SizeLabel     @relation(fields: [sizeLabelId], references: [id], onDelete: Cascade)
+
+  @@unique([initiativeId, estimateFieldId])
+  @@index([sizeLabelId])
 }
 
 model Milestone {
@@ -91,20 +132,17 @@ model Increment {
 }
 
 model Initiative {
-  id                        String   @id @default(cuid())
-  incrementId               String
-  name                      String
-  orderKey                  String
-  policySizeLabelId         String?
-  implementationSizeLabelId String?
-  timeEstimateWeeks         Float?
-  notes                     String?
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  id                String   @id @default(cuid())
+  incrementId       String
+  name              String
+  orderKey          String
+  timeEstimateWeeks Float?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  increment               Increment  @relation(fields: [incrementId], references: [id], onDelete: Cascade)
-  policySizeLabel         SizeLabel? @relation("InitiativePolicySize", fields: [policySizeLabelId], references: [id], onDelete: SetNull)
-  implementationSizeLabel SizeLabel? @relation("InitiativeImplementationSize", fields: [implementationSizeLabelId], references: [id], onDelete: SetNull)
+  increment      Increment                 @relation(fields: [incrementId], references: [id], onDelete: Cascade)
+  estimateValues InitiativeEstimateValue[]
 
   @@index([incrementId])
 }

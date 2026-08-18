@@ -5,9 +5,12 @@ import {
   idSchema,
   importRoadmapSchema,
   initialOrderKeys,
+  RESERVED_ROADMAP_ROW_COLUMNS,
   updateProjectSchema,
 } from '@roadmap/shared';
 import { publicProcedure, router, TRPCError } from '../trpc.js';
+
+const RESERVED_COLUMNS = new Set<string>(RESERVED_ROADMAP_ROW_COLUMNS);
 
 function parseHeaderScales(raw: string): string[] {
   try {
@@ -33,12 +36,13 @@ export const projectRouter = router({
       where: { id: input.id },
       include: {
         sizeLabels: { orderBy: { orderIndex: 'asc' } },
+        estimateFields: { orderBy: { orderIndex: 'asc' } },
         milestones: {
           orderBy: { orderKey: 'asc' },
           include: {
             increments: {
               orderBy: { orderKey: 'asc' },
-              include: { initiatives: { orderBy: { orderKey: 'asc' } } },
+              include: { initiatives: { orderBy: { orderKey: 'asc' }, include: { estimateValues: true } } },
             },
           },
         },
@@ -48,8 +52,21 @@ export const projectRouter = router({
     return toProjectDTO(project);
   }),
 
+  // Seeds the two estimate fields ("Policy"/"Implementation") that reproduce
+  // today's out-of-the-box sizing behavior (Final = max of the two) — fully
+  // editable afterward from Project Settings, including down to zero fields.
   create: publicProcedure.input(createProjectSchema).mutation(async ({ ctx, input }) => {
-    const project = await ctx.prisma.project.create({ data: input });
+    const project = await ctx.prisma.project.create({
+      data: {
+        ...input,
+        estimateFields: {
+          create: [
+            { name: 'Policy', orderIndex: 0 },
+            { name: 'Implementation', orderIndex: 1 },
+          ],
+        },
+      },
+    });
     return toProjectDTO(project);
   }),
 
@@ -123,8 +140,9 @@ export const projectRouter = router({
 
     interface GroupedInitiative {
       name: string;
-      policyCode: string | null;
-      implementationCode: string | null;
+      // fieldName -> size code, for whichever estimate-field columns this
+      // row had a non-empty value in.
+      estimates: Map<string, string>;
       timeEstimateWeeks: number | null;
       notes: string | null;
     }
@@ -142,14 +160,26 @@ export const projectRouter = router({
     // there's never an existing row to match against — "first time we see
     // this milestone/increment name" is the only lookup this needs.
     const milestones = new Map<string, GroupedMilestone>();
+    // Estimate-field names, in first-seen column order — one column per
+    // configured field, discovered from whatever columns the file actually
+    // has (the field list isn't fixed, unlike the old Policy/Implementation
+    // pair, so there's no schema to read it from ahead of time).
+    const fieldNames: string[] = [];
+    // code -> orderIndex, built the same "first-seen across every estimate
+    // column" way the old policy/implementation pair used, just generalized
+    // to however many fields are present.
     const sizeCodes: string[] = [];
     const warnings: string[] = [];
 
     for (const row of input.rows) {
-      const policyCode = row.policySize?.trim() || null;
-      const implementationCode = row.implementationSize?.trim() || null;
-      for (const code of [policyCode, implementationCode]) {
-        if (code && !sizeCodes.includes(code)) sizeCodes.push(code);
+      const rowEstimates = new Map<string, string>();
+      for (const [key, value] of Object.entries(row)) {
+        if (RESERVED_COLUMNS.has(key)) continue;
+        const code = value?.trim();
+        if (!code) continue;
+        if (!fieldNames.includes(key)) fieldNames.push(key);
+        if (!sizeCodes.includes(code)) sizeCodes.push(code);
+        rowEstimates.set(key, code);
       }
 
       let timeEstimateWeeks: number | null = null;
@@ -158,7 +188,7 @@ export const projectRouter = router({
         const parsed = Number(rawEstimate);
         if (Number.isFinite(parsed) && parsed > 0) timeEstimateWeeks = parsed;
       }
-      if ((policyCode || implementationCode) && timeEstimateWeeks != null) {
+      if (rowEstimates.size > 0 && timeEstimateWeeks != null) {
         warnings.push(`"${row.initiative}" had both a size and a time estimate — kept the size, ignored the time estimate.`);
         timeEstimateWeeks = null;
       }
@@ -175,8 +205,7 @@ export const projectRouter = router({
       }
       increment.initiatives.push({
         name: row.initiative,
-        policyCode,
-        implementationCode,
+        estimates: rowEstimates,
         timeEstimateWeeks,
         notes: row.notes?.trim() ? row.notes.trim() : null,
       });
@@ -189,6 +218,12 @@ export const projectRouter = router({
       for (let i = 0; i < sizeCodes.length; i++) {
         const label = await tx.sizeLabel.create({ data: { projectId: project.id, code: sizeCodes[i], orderIndex: i } });
         labelIdByCode.set(sizeCodes[i], label.id);
+      }
+
+      const fieldIdByName = new Map<string, string>();
+      for (let i = 0; i < fieldNames.length; i++) {
+        const field = await tx.estimateField.create({ data: { projectId: project.id, name: fieldNames[i], orderIndex: i } });
+        fieldIdByName.set(fieldNames[i], field.id);
       }
 
       const milestoneList = [...milestones.values()];
@@ -214,12 +249,14 @@ export const projectRouter = router({
                 incrementId: increment.id,
                 name: initiative.name,
                 orderKey: initiativeKeys[n],
-                policySizeLabelId: initiative.policyCode ? labelIdByCode.get(initiative.policyCode) : null,
-                implementationSizeLabelId: initiative.implementationCode
-                  ? labelIdByCode.get(initiative.implementationCode)
-                  : null,
                 timeEstimateWeeks: initiative.timeEstimateWeeks,
                 notes: initiative.notes,
+                estimateValues: {
+                  create: [...initiative.estimates.entries()].map(([fieldName, code]) => ({
+                    estimateFieldId: fieldIdByName.get(fieldName)!,
+                    sizeLabelId: labelIdByCode.get(code)!,
+                  })),
+                },
               },
             });
           }

@@ -18,11 +18,14 @@ interface SizeLabel {
   code: string;
   orderIndex: number;
 }
+interface InitiativeEstimateValue {
+  estimateFieldId: string;
+  sizeLabelId: string;
+}
 interface Initiative {
   id: string;
   name: string;
-  policySizeLabelId: string | null;
-  implementationSizeLabelId: string | null;
+  estimateValues: InitiativeEstimateValue[];
   timeEstimateWeeks: number | null;
 }
 interface Increment {
@@ -37,6 +40,7 @@ interface Milestone {
 }
 interface ProjectData {
   sizeLabels: SizeLabel[];
+  finalSizeFormula: string;
   milestones: Milestone[];
   startDate: string | Date | null;
   timelineHeaderScales: string[];
@@ -81,7 +85,11 @@ export default function ExportSizingKeySnapshot({
     const sequence: TimelineInitiativeInput[] = project.milestones.flatMap((m) =>
       m.increments.flatMap((inc) =>
         inc.initiatives.map((init) => {
-          const finalSize = computeFinalSize(project.sizeLabels, init.policySizeLabelId, init.implementationSizeLabelId);
+          const finalSize = computeFinalSize(
+            project.sizeLabels,
+            init.estimateValues.map((v) => v.sizeLabelId),
+            project.finalSizeFormula as 'max' | 'min'
+          );
           return {
             initiativeId: init.id,
             name: init.name,

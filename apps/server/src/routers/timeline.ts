@@ -24,7 +24,7 @@ export const timelineRouter = router({
             include: {
               increments: {
                 orderBy: { orderKey: 'asc' },
-                include: { initiatives: { orderBy: { orderKey: 'asc' } } },
+                include: { initiatives: { orderBy: { orderKey: 'asc' }, include: { estimateValues: true } } },
               },
             },
           },
@@ -55,8 +55,8 @@ export const timelineRouter = router({
         increment.initiatives.map((initiative) => {
           const finalSize = computeFinalSize(
             project.sizeLabels,
-            initiative.policySizeLabelId,
-            initiative.implementationSizeLabelId
+            initiative.estimateValues.map((v) => v.sizeLabelId),
+            project.finalSizeFormula as 'max' | 'min'
           );
           return {
             initiativeId: initiative.id,

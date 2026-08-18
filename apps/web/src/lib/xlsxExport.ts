@@ -1,16 +1,24 @@
 import ExcelJS from 'exceljs';
-import { buildRoadmapRows, ROADMAP_COLUMNS } from './roadmapExport.js';
+import { buildRoadmapColumns, buildRoadmapRows } from './roadmapExport.js';
 
 interface SizeLabel {
   id: string;
   code: string;
   orderIndex: number;
 }
+interface EstimateField {
+  id: string;
+  name: string;
+  orderIndex: number;
+}
+interface InitiativeEstimateValue {
+  estimateFieldId: string;
+  sizeLabelId: string;
+}
 interface Initiative {
   id: string;
   name: string;
-  policySizeLabelId: string | null;
-  implementationSizeLabelId: string | null;
+  estimateValues: InitiativeEstimateValue[];
   timeEstimateWeeks: number | null;
   notes: string | null;
 }
@@ -27,6 +35,8 @@ interface Milestone {
 interface ProjectData {
   name: string;
   sizeLabels: SizeLabel[];
+  estimateFields: EstimateField[];
+  finalSizeFormula: string;
   milestones: Milestone[];
 }
 
@@ -71,11 +81,12 @@ export async function buildProjectWorkbook(project: ProjectData, keyExports: Key
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Program Roadmap Generator';
 
+  const roadmapColumns = buildRoadmapColumns(project);
   const projectSheet = workbook.addWorksheet('Project');
-  const headerRow = projectSheet.addRow(ROADMAP_COLUMNS);
+  const headerRow = projectSheet.addRow(roadmapColumns);
   headerRow.font = { bold: true };
   for (const row of buildRoadmapRows(project)) {
-    projectSheet.addRow(ROADMAP_COLUMNS.map((c) => row[c]));
+    projectSheet.addRow(roadmapColumns.map((c) => row[c]));
   }
   projectSheet.columns.forEach((col) => {
     col.width = 22;

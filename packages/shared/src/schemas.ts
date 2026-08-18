@@ -5,6 +5,8 @@ export const phaseUnitSchema = z.enum(['day', 'week', 'month']);
 export const scaleUnitSchema = z.enum(['day', 'week', 'month', 'sprint', 'quarter', 'year']);
 /** 0=Sunday..6=Saturday, matching Date#getUTCDay(). */
 export const weekdaySchema = z.number().int().min(0).max(6);
+/** How an initiative's per-field estimate values combine into its Final size — see computeFinalSize(). */
+export const finalSizeFormulaSchema = z.enum(['max', 'min']);
 
 export const createProjectSchema = z.object({
   name: z.string().min(1),
@@ -20,6 +22,7 @@ export const updateProjectSchema = z.object({
   timelineHeaderScales: z.array(scaleUnitSchema).optional(),
   sprintLengthBusinessDays: z.number().int().positive().nullable().optional(),
   sprintStartWeekday: weekdaySchema.nullable().optional(),
+  finalSizeFormula: finalSizeFormulaSchema.optional(),
 });
 
 export const reorderSchema = z.object({
@@ -36,6 +39,17 @@ export const createSizeLabelSchema = z.object({
 export const renameSizeLabelSchema = z.object({
   id: idSchema,
   code: z.string().min(1).max(20),
+});
+
+export const createEstimateFieldSchema = z.object({
+  projectId: idSchema,
+  name: z.string().min(1).max(40),
+  afterId: idSchema.nullable().optional(),
+});
+
+export const renameEstimateFieldSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1).max(40),
 });
 
 export const createMilestoneSchema = z.object({
@@ -67,23 +81,32 @@ export const createInitiativeSchema = z.object({
   name: z.string().min(1),
 });
 
+/** One estimate field's value for an initiative — `sizeLabelId: null` clears that field. */
+export const initiativeEstimateValueInputSchema = z.object({
+  estimateFieldId: idSchema,
+  sizeLabelId: idSchema.nullable(),
+});
+
 /**
- * Mutual exclusivity: an Initiative is sized via Policy/Implementation size
- * labels OR a raw time estimate, never both. `null` explicitly clears a
- * field; `undefined` leaves it untouched.
+ * Mutual exclusivity: an Initiative is sized via its project's configured
+ * estimate fields OR a raw time estimate, never both. `estimateValues` is a
+ * partial update — only the fields included are touched, the rest are left
+ * as they are (mirrors the UI, where each field's dropdown mutates only
+ * itself). Setting any field's sizeLabelId to non-null clears
+ * timeEstimateWeeks server-side, and setting timeEstimateWeeks clears every
+ * estimate value — see initiative.update in apps/server.
  */
 export const updateInitiativeSchema = z
   .object({
     id: idSchema,
     name: z.string().min(1).optional(),
     notes: z.string().nullable().optional(),
-    policySizeLabelId: idSchema.nullable().optional(),
-    implementationSizeLabelId: idSchema.nullable().optional(),
+    estimateValues: z.array(initiativeEstimateValueInputSchema).optional(),
     timeEstimateWeeks: z.number().positive().nullable().optional(),
   })
   .refine(
     (input) => {
-      const settingSize = input.policySizeLabelId != null || input.implementationSizeLabelId != null;
+      const settingSize = input.estimateValues?.some((v) => v.sizeLabelId != null) ?? false;
       const settingEstimate = input.timeEstimateWeeks != null;
       return !(settingSize && settingEstimate);
     },
@@ -160,22 +183,33 @@ export const computeTimelineInputSchema = z.object({
 });
 
 /**
- * One row per initiative, mirroring RoadmapRow's own field set minus
- * `project` (the target project name is a separate top-level field, since
- * import always creates a fresh project rather than reading it per-row) and
- * `finalSize` (always recomputed, never imported). Every field arrives as a
- * string, matching how both the CSV and JSON roadmap export always encode
- * it — numbers-as-strings for timeEstimateWeeks included.
+ * Column names reserved by the fixed part of a roadmap row — everything else
+ * in an imported row's columns is treated as an estimate-field value, keyed
+ * by its own header text (see importRoadmap's row grouping in apps/server).
+ * `project` and `finalSize` are round-tripped from RoadmapRow's own export
+ * columns but never read on import: `project` is a separate top-level field
+ * (import always creates a fresh project rather than reading it per-row),
+ * and `finalSize` is always recomputed, never imported.
  */
-export const importRoadmapRowSchema = z.object({
-  milestone: z.string().min(1),
-  increment: z.string().min(1),
-  initiative: z.string().min(1),
-  policySize: z.string().optional(),
-  implementationSize: z.string().optional(),
-  timeEstimateWeeks: z.string().optional(),
-  notes: z.string().optional(),
-});
+export const RESERVED_ROADMAP_ROW_COLUMNS = ['project', 'milestone', 'increment', 'initiative', 'finalSize', 'timeEstimateWeeks', 'notes'] as const;
+
+/**
+ * One row per initiative. The fixed columns below are required/typed;
+ * anything else is one project-defined estimate field's value, keyed by its
+ * column header — there's no fixed list of them since fields are
+ * project-configurable. Every field arrives as a string, matching how both
+ * the CSV and JSON roadmap export always encode it — numbers-as-strings for
+ * timeEstimateWeeks included.
+ */
+export const importRoadmapRowSchema = z
+  .object({
+    milestone: z.string().min(1),
+    increment: z.string().min(1),
+    initiative: z.string().min(1),
+    timeEstimateWeeks: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .catchall(z.string().optional());
 
 export const importRoadmapSchema = z.object({
   name: z.string().min(1),

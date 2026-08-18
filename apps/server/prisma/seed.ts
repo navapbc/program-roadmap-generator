@@ -24,6 +24,14 @@ async function main() {
   );
   const labelIdByCode = new Map(projectLabels.map((l) => [l.code, l.id]));
 
+  // Configurable estimate fields — Policy/Implementation reproduce the app's
+  // out-of-the-box behavior (Final = max of the two, via Project's default
+  // finalSizeFormula), fully editable from Project Settings afterward.
+  const policyField = await prisma.estimateField.create({ data: { projectId: project.id, name: 'Policy', orderIndex: 0 } });
+  const implementationField = await prisma.estimateField.create({
+    data: { projectId: project.id, name: 'Implementation', orderIndex: 1 },
+  });
+
   // 2 Milestones x 2 Increments x 3-5 Initiatives.
   const milestoneKeys = initialOrderKeys(2);
   for (let m = 0; m < 2; m++) {
@@ -64,13 +72,18 @@ async function main() {
           });
         } else {
           const code = sizeCodes[n % sizeCodes.length];
+          const sizeLabelId = labelIdByCode.get(code)!;
           await prisma.initiative.create({
             data: {
               incrementId: increment.id,
               name: `Initiative ${m + 1}.${inc + 1}.${n + 1}`,
               orderKey: initiativeKeys[n],
-              policySizeLabelId: labelIdByCode.get(code),
-              implementationSizeLabelId: labelIdByCode.get(code),
+              estimateValues: {
+                create: [
+                  { estimateFieldId: policyField.id, sizeLabelId },
+                  { estimateFieldId: implementationField.id, sizeLabelId },
+                ],
+              },
             },
           });
         }

@@ -10,22 +10,32 @@ const labels = [
 ];
 
 describe('computeFinalSize', () => {
-  it('returns the larger of policy and implementation by orderIndex', () => {
-    expect(computeFinalSize(labels, 's', 'l')?.code).toBe('L');
-    expect(computeFinalSize(labels, 'xl', 'xs')?.code).toBe('XL');
+  it('defaults to max: returns the largest of two values by orderIndex', () => {
+    expect(computeFinalSize(labels, ['s', 'l'])?.code).toBe('L');
+    expect(computeFinalSize(labels, ['xl', 'xs'])?.code).toBe('XL');
   });
 
-  it('returns whichever single field is set', () => {
-    expect(computeFinalSize(labels, 'm', null)?.code).toBe('M');
-    expect(computeFinalSize(labels, null, 's')?.code).toBe('S');
+  it('max: returns the largest across more than two values', () => {
+    expect(computeFinalSize(labels, ['s', 'm', 'l'], 'max')?.code).toBe('L');
   });
 
-  it('returns null when neither is set', () => {
-    expect(computeFinalSize(labels, null, null)).toBeNull();
+  it('min: returns the smallest of the values', () => {
+    expect(computeFinalSize(labels, ['s', 'l'], 'min')?.code).toBe('S');
+    expect(computeFinalSize(labels, ['m', 's', 'l'], 'min')?.code).toBe('S');
+  });
+
+  it('returns whichever single value is set, ignoring unset entries', () => {
+    expect(computeFinalSize(labels, ['m', null])?.code).toBe('M');
+    expect(computeFinalSize(labels, [null, 's', undefined])?.code).toBe('S');
+  });
+
+  it('returns null when no values are set', () => {
+    expect(computeFinalSize(labels, [null, null])).toBeNull();
+    expect(computeFinalSize(labels, [])).toBeNull();
   });
 
   it('ties resolve to either label of the same rank', () => {
-    expect(computeFinalSize(labels, 'm', 'm')?.code).toBe('M');
+    expect(computeFinalSize(labels, ['m', 'm'])?.code).toBe('M');
   });
 });
 
