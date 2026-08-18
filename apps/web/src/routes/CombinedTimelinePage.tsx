@@ -43,6 +43,7 @@ export default function CombinedTimelinePage() {
   const [scales, setScales] = useState<ScaleUnit[]>(DEFAULT_SCALES);
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
+  const [hideUnsized, setHideUnsized] = useState(false);
   const [viewId, setViewId] = useState<string | null>(null);
   const [viewName, setViewName] = useState('');
 
@@ -365,6 +366,12 @@ export default function CombinedTimelinePage() {
               onToggle={toggleScale}
             />
           </div>
+          <div>
+            <label className="flex items-center gap-1 text-sm text-slate-700">
+              <input type="checkbox" checked={hideUnsized} onChange={(e) => setHideUnsized(e.target.checked)} />
+              Hide unsized initiatives
+            </label>
+          </div>
           {hasStartDate && (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -403,7 +410,9 @@ export default function CombinedTimelinePage() {
       )}
       </div>
 
-      {groups.length > 0 && <CombinedTimelineView groups={groups} scales={scales} zoom={zoom} dateWindow={dateWindow} />}
+      {groups.length > 0 && (
+        <CombinedTimelineView groups={groups} scales={scales} zoom={zoom} dateWindow={dateWindow} hideUnsized={hideUnsized} />
+      )}
     </div>
   );
 }

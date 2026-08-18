@@ -77,23 +77,30 @@ export default function CombinedTimelineView({
   scales,
   zoom,
   dateWindow,
+  hideUnsized = false,
 }: {
   groups: CombinedScopeGroup[];
   scales: ScaleUnit[];
   zoom: ReturnType<typeof useZoom>;
   /** Restricts the visible chart to a date window (in shared-origin week-offsets) — out-of-window rows stay in the list but render greyed with an explanatory note. */
   dateWindow?: DateRangeWindow;
+  /** Omits initiatives with no size or time estimate set entirely, rather than showing them as zero-width "unsized" rows. */
+  hideUnsized?: boolean;
 }) {
   if (groups.length === 0) return null;
 
-  const sharedOrigin = computeSharedOrigin(groups);
+  const visibleGroups = hideUnsized
+    ? groups.map((g) => ({ ...g, rows: g.rows.filter((r) => r.warning !== 'missing-size') }))
+    : groups;
+
+  const sharedOrigin = computeSharedOrigin(visibleGroups);
   const offsetByScope = new Map(
-    groups.map((g) => [
+    visibleGroups.map((g) => [
       g.scopeId,
       sharedOrigin && g.startDate ? weeksBetween(sharedOrigin, g.startDate) : 0,
     ])
   );
-  const fullSharedTotalWeeks = computeSharedTotalWeeks(groups);
+  const fullSharedTotalWeeks = computeSharedTotalWeeks(visibleGroups);
 
   const windowStart = dateWindow?.startOffsetWeeks ?? 0;
   const windowEnd = dateWindow?.endOffsetWeeks ?? fullSharedTotalWeeks;
@@ -102,15 +109,15 @@ export default function CombinedTimelineView({
   const windowStartDate =
     sharedOrigin && windowStart !== 0 ? new Date(sharedOrigin.getTime() + windowStart * 7 * 24 * 60 * 60 * 1000) : sharedOrigin;
 
-  const phaseNames = [...new Set(groups.flatMap((g) => g.rows.flatMap((r) => r.segments.map((s) => s.phaseName))))];
+  const phaseNames = [...new Set(visibleGroups.flatMap((g) => g.rows.flatMap((r) => r.segments.map((s) => s.phaseName))))];
   const colorByPhase = new Map(phaseNames.map((name, i) => [name, PHASE_COLORS[i % PHASE_COLORS.length]]));
 
   // Different scopes can have different sprint cadences; showing one
   // shared Sprint row only makes sense with one cadence, so just use
   // whichever anchored scope has one configured first, in scope order.
-  const sprintCadence = groups.find((g) => g.startDate && g.sprintCadence)?.sprintCadence ?? null;
+  const sprintCadence = visibleGroups.find((g) => g.startDate && g.sprintCadence)?.sprintCadence ?? null;
 
-  const markers: MarkerTick[] = groups.flatMap((g) => {
+  const markers: MarkerTick[] = visibleGroups.flatMap((g) => {
     const offset = offsetByScope.get(g.scopeId) ?? 0;
     return (g.markers ?? []).map((m) => ({ id: m.id, label: `${m.label} (${g.label})`, offsetWeeks: offset + m.offsetWeeks - windowStart }));
   });
@@ -149,7 +156,7 @@ export default function CombinedTimelineView({
             </div>
           </div>
 
-          {groups.map((group) => {
+          {visibleGroups.map((group) => {
             const offset = offsetByScope.get(group.scopeId) ?? 0;
             const isUnanchored = sharedOrigin != null && group.startDate == null;
             const rowsByInitiativeId = new Map(group.rows.map((r) => [r.initiativeId, r]));
