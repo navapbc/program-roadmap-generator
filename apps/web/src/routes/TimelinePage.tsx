@@ -32,6 +32,7 @@ export default function TimelinePage() {
   const [rangeStart, setRangeStart] = useState<string>('');
   const [rangeEnd, setRangeEnd] = useState<string>('');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [hideUnsized, setHideUnsized] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -202,6 +203,12 @@ export default function TimelinePage() {
             onToggle={toggleScale}
           />
         </div>
+        <div>
+          <label className="flex items-center gap-1 text-sm text-slate-700">
+            <input type="checkbox" checked={hideUnsized} onChange={(e) => setHideUnsized(e.target.checked)} />
+            Hide unsized initiatives
+          </label>
+        </div>
         {startDate && (
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -251,6 +258,7 @@ export default function TimelinePage() {
             markers={markers}
             zoom={zoom}
             dateWindow={dateWindow}
+            hideUnsized={hideUnsized}
           />
         </div>
       )}

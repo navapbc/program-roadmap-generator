@@ -49,6 +49,7 @@ export default function GanttChart({
   markers = [],
   zoom,
   dateWindow,
+  hideUnsized = false,
 }: {
   result: TimelineResultDTO;
   milestoneBoundaries: MilestoneBoundary[];
@@ -59,11 +60,14 @@ export default function GanttChart({
   zoom: ReturnType<typeof useZoom>;
   /** Restricts the visible chart to a date window — out-of-window rows stay in the list but render greyed with an explanatory note. */
   dateWindow?: DateRangeWindow;
+  /** Omits initiatives with no size or time estimate set entirely, rather than showing them as zero-width "unsized" rows. */
+  hideUnsized?: boolean;
 }) {
-  const phaseNames = [...new Set(result.rows.flatMap((r) => r.segments.map((s) => s.phaseName)))];
+  const visibleRows = hideUnsized ? result.rows.filter((r) => r.warning !== 'missing-size') : result.rows;
+  const phaseNames = [...new Set(visibleRows.flatMap((r) => r.segments.map((s) => s.phaseName)))];
   const colorByPhase = new Map(phaseNames.map((name, i) => [name, PHASE_COLORS[i % PHASE_COLORS.length]]));
 
-  const rowsByInitiativeId = new Map(result.rows.map((r) => [r.initiativeId, r]));
+  const rowsByInitiativeId = new Map(visibleRows.map((r) => [r.initiativeId, r]));
   const fullTotal = result.totalDurationWeeks || 1;
 
   // A date window narrows the visible axis to [windowStart, windowEnd] —
